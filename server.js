@@ -41,6 +41,12 @@ const STATIC = {
 };
 const PREVIEW_WIDTH = 320; // pixels; plenty for the small camera panel
 
+// SDK hints that need saying differently to a person (by ValidationCode).
+const FRIENDLY_HINTS = {
+  // A webcam in dim light lengthens its exposure and drops to about 15 frames a second.
+  11: 'Camera too slow (under 25 frames a second). Light facing you usually fixes it.',
+};
+
 let session = null;            // the one active camera session, if any
 let teardown = Promise.resolve();
 
@@ -100,6 +106,8 @@ async function startSession(req, res) {
       // the session starts (the arterial pressure trace needs one), and that is one more
       // thing that can fail.
       requestedMetrics: [MetricType.CHEST_BREATHING, MetricType.BREATHING_RATE, MetricType.PULSE_RATE],
+      // The SDK's own usage reports to Presage. Off, so the privacy note can say so plainly.
+      enableTelemetry: false,
     });
   } catch (e) {
     return fail('Could not create SmartSpectra session: ' + e.message);
@@ -114,7 +122,7 @@ async function startSession(req, res) {
     if (session !== s || code === s.lastCode) return;
     s.lastCode = code;
     console.log(`[vitals] hint ${code}: ${code === 0 ? 'ok, measuring' : hint}`);
-    send(res, 'status', { code, text: code === 0 ? '' : hint || 'Adjusting…' });
+    send(res, 'status', { code, text: code === 0 ? '' : FRIENDLY_HINTS[code] || hint || 'Adjusting…' });
   });
 
   // Keep only the newest camera picture, for /preview. Counting them also tells us how
