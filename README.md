@@ -7,6 +7,10 @@ Nothing to wear, hold or press.
 
 Built for the Presage SmartSpectra SDK Challenge (November 2026).
 
+**Try it:** https://bodyband.vercel.app — the Simulated and Manual modes, with no install.
+Camera mode reads a webcam through the SmartSpectra SDK on your own PC, so it can't run on a
+hosted page; see [Run it](#run-it) below.
+
 ![Body Band console during a session](docs/screenshot.jpg)
 
 ## How it works
