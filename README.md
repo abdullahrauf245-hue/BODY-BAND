@@ -62,7 +62,10 @@ Simulated and Manual modes also work by just double-clicking `index.html`, with 
 ### Tips for camera mode
 
 - Face the camera in good light, with your face and chest in frame, and sit fairly still.
-- The camera panel shows your live picture (mirrored), so you can check framing and light.
+- Before every camera session a **camera check** opens: it explains what will happen, shows
+  your webcam through the browser with a head-and-chest outline, and measures its frame rate
+  and light. It uses no SDK minutes. Nothing starts until you press START MEASURING.
+- During the session the camera panel shows your live picture (mirrored).
 - Hints such as "face not centered" appear in the camera panel.
 - The SDK needs at least 25 camera frames a second. The panel's CAMERA FEED row shows what
   your webcam is delivering; if it is lower, add light. The camera mode defaults to 640x480
@@ -76,8 +79,10 @@ Simulated and Manual modes also work by just double-clicking `index.html`, with 
 - The API key stays in `.env` on your PC. It is ignored by git and never sent to the browser.
 - Body Band does not record, store or upload video or vitals. The live picture in the camera
   panel goes from the SDK to your own browser on the same PC and is held in memory only while
-  a session runs. The SmartSpectra SDK does its own processing and talks to Presage's
-  service; see Presage's documentation for details.
+  a session runs. The SmartSpectra SDK contacts Presage to check the API key, count usage
+  and fetch its models; its telemetry reports are turned off (`enableTelemetry: false`).
+  See Presage's documentation for details.
+- Camera consent: the camera check above asks before every session.
 - The server only listens on your own PC (`127.0.0.1`), and only the Body Band page itself
   can start the camera or read its picture.
 
