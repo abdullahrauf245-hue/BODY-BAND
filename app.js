@@ -78,13 +78,17 @@
   const drawSegs = (lit) => segs.forEach((s, i) => { s.className = i < lit - 1 ? 'on' : i === lit - 1 ? 'tip' : ''; });
   $('arc').setAttribute('stroke-dasharray', ARC_LEN);
 
-  const cameraAvailable = location.protocol.startsWith('http');
+  // Camera mode needs the local server (server.js), which runs the SmartSpectra SDK on the
+  // PC that owns the webcam. A hosted copy of this page has no such server, and must never
+  // be able to spend anyone's SDK minutes, so the camera is offered only on this PC.
+  const cameraAvailable = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   if (cameraAvailable) {
     $('camSourceBtn').disabled = false;
     $('camSourceBtn').title = 'Real pulse and breathing from the camera (uses free minutes)';
     $('useCamBtn').disabled = false;
   } else {
-    setText('camHint', 'RUN "NPM START" TO ENABLE');
+    setText('camHint', 'CAMERA MODE RUNS ON YOUR PC — SEE README');
+    $('camSourceBtn').title = 'Camera mode runs on your own PC with the SmartSpectra SDK: see the README';
   }
 
   // ---------- helpers ----------
