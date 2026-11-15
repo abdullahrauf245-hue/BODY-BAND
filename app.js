@@ -86,7 +86,10 @@
   // ---------- lifecycle ----------
   async function begin() {
     const pick = document.querySelector('input[name="source"]:checked').value;
-    source = pick === 'manual' ? new Signals.ManualSource() : new Signals.SimulatedSource();
+    source = pick === 'manual' ? new Signals.ManualSource()
+      : pick === 'presage' ? new Signals.PresageSource()
+      : new Signals.SimulatedSource();
+    $('notice').textContent = '';
     band = new BodyBand();
     await band.start();
 
@@ -99,6 +102,14 @@
         state.beatGlow = 1;
         if (!reduceMotion) state.ripples.push({ age: 0 });
         band.beat(state.pulse);
+      } else if (e.type === 'status') {
+        $('hint').textContent = e.text;
+        $('hint').hidden = !e.text;
+      } else if (e.type === 'time') {
+        const m = Math.floor(e.left / 60), s = String(e.left % 60).padStart(2, '0');
+        $('sourceTag').textContent = `${source.label} · ${m}:${s} left`;
+      } else if (e.type === 'ended') {
+        end(e.reason);
       }
     });
     source.start();
@@ -109,17 +120,28 @@
     $('hud').hidden = false;
   }
 
-  async function end() {
+  async function end(reason) {
+    if (!source) return;
+    $('notice').textContent = typeof reason === 'string' ? reason : '';
+    $('hint').hidden = true;
     state.live = false;
     if (unsub) unsub();
-    if (source) source.stop();
-    if (band) await band.stop();
+    source.stop();
+    const b = band;
     source = band = unsub = null;
+    if (b) await b.stop();
     Object.assign(state, { pulse: 0, breathRate: 0, ripples: [] });
     $('mute').textContent = 'Mute';
     $('mute').setAttribute('aria-pressed', 'false');
     $('hud').hidden = true;
     $('intro').hidden = false;
+  }
+
+  // The camera mode needs server.js (npm start); it can't work from a double-clicked file.
+  if (location.protocol.startsWith('http')) {
+    $('presageOption').classList.remove('disabled');
+    $('presageOption').querySelector('input').disabled = false;
+    $('presageNote').textContent = '(real pulse + breathing · uses free minutes · auto-stops after 2 min)';
   }
 
   $('begin').addEventListener('click', begin);

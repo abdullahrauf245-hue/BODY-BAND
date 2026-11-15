@@ -17,12 +17,14 @@
     <div class="source-pick" role="radiogroup" aria-label="Signal source">
       <label><input type="radio" name="source" value="sim" checked> Simulated body <small>(demo, no camera)</small></label>
       <label><input type="radio" name="source" value="manual"> Manual <small>(hold Space / press screen to inhale)</small></label>
-      <label class="disabled"><input type="radio" name="source" value="presage" disabled> SmartSpectra camera <small>(coming next)</small></label>
+      <label class="disabled" id="presageOption"><input type="radio" name="source" value="presage" disabled> SmartSpectra camera <small id="presageNote">(start with "npm start" to use)</small></label>
     </div>
     <button id="begin" class="btn">Begin</button>
+    <p id="notice" class="notice" role="status"></p>
   </section>
 
   <!-- Live HUD -->
+  <p id="hint" class="hint" role="status" hidden></p>
   <section id="hud" class="hud" hidden>
     <div class="stat">
       <span class="label">Pulse</span>
