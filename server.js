@@ -74,13 +74,16 @@ async function startSession(req, res) {
   } catch (e) {
     return fail('SmartSpectra SDK failed to load: ' + e.message);
   }
-  const { SmartSpectraSDK, CameraSelection, breathingMetrics, cardioMetrics } = sdkLib;
+  const { SmartSpectraSDK, CameraSelection, MetricType } = sdkLib;
 
   let sdk;
   try {
     sdk = new SmartSpectraSDK({
       apiKey,
-      requestedMetrics: [...breathingMetrics, ...cardioMetrics],
+      // Only what the music uses. Asking for more makes the SDK fetch extra models when
+      // the session starts (the arterial pressure trace needs one), and that is one more
+      // thing that can fail.
+      requestedMetrics: [MetricType.CHEST_BREATHING, MetricType.BREATHING_RATE, MetricType.PULSE_RATE],
     });
   } catch (e) {
     return fail('Could not create SmartSpectra session: ' + e.message);
