@@ -5,6 +5,8 @@
  *     breathing to the page (Server-Sent Events). The session ends when the
  *     page disconnects or after MAX_SECONDS, whichever comes first, so the
  *     camera can never be left running by accident.
+ *   - GET /preview : the latest camera picture, shrunk, for the live view on the page.
+ *     It is held in memory only while a session runs and is never written to disk.
  *
  * The API key is read from .env (PRESAGE_API_KEY) and never leaves this process.
  */
@@ -12,6 +14,7 @@ require('dotenv').config({ quiet: true });
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { toRgba } = require('./preview');
 
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_SECONDS = Number(process.env.PRESAGE_MAX_SECONDS) || 120;
@@ -34,7 +37,9 @@ const STATIC = {
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/audio.js': ['audio.js', 'text/javascript; charset=utf-8'],
   '/signals.js': ['signals.js', 'text/javascript; charset=utf-8'],
+  '/camview.js': ['camview.js', 'text/javascript; charset=utf-8'],
 };
+const PREVIEW_WIDTH = 320; // pixels; plenty for the small camera panel
 
 let session = null;            // the one active camera session, if any
 let teardown = Promise.resolve();
@@ -49,6 +54,7 @@ function endSession(reason) {
   if (!session) return teardown;
   const s = session;
   session = null;
+  s.frame = null; // drop the last camera picture
   clearTimeout(s.timer);
   clearInterval(s.ticker);
   const used = Math.round((Date.now() - s.startedAt) / 1000);
@@ -99,12 +105,25 @@ async function startSession(req, res) {
     return fail('Could not create SmartSpectra session: ' + e.message);
   }
 
-  const s = (session = { sdk, res, startedAt: Date.now(), packets: 0, lastCode: -1 });
+  const s = (session = {
+    sdk, res, startedAt: Date.now(), packets: 0, lastCode: -1,
+    frame: null, frames: 0, framesAtLastTick: 0, ticks: 0,
+  });
 
   sdk.on('validationStatus', (code, ts, hint) => {
     if (session !== s || code === s.lastCode) return;
     s.lastCode = code;
+    console.log(`[vitals] hint ${code}: ${code === 0 ? 'ok, measuring' : hint}`);
     send(res, 'status', { code, text: code === 0 ? '' : hint || 'Adjusting…' });
+  });
+
+  // Keep only the newest camera picture, for /preview. Counting them also tells us how
+  // many frames a second the SDK is really getting from the webcam.
+  sdk.on('videoOutput', (buf, width, height, stride, format) => {
+    if (session !== s) return;
+    if (!s.frame) console.log(`[vitals] camera picture: ${width}x${height}, pixel format ${format}`);
+    s.frame = { buf, width, height, stride, format };
+    s.frames++;
   });
 
   sdk.on('metrics', (buf) => {
@@ -143,15 +162,31 @@ async function startSession(req, res) {
   s.timer = setTimeout(() => endSession(`Auto-stopped after ${MAX_SECONDS} seconds`), MAX_SECONDS * 1000);
   s.ticker = setInterval(() => {
     const left = Math.max(0, MAX_SECONDS - Math.round((Date.now() - s.startedAt) / 1000));
-    send(res, 'tick', { left });
+    const fps = s.frames - s.framesAtLastTick; // camera frames in the last second
+    s.framesAtLastTick = s.frames;
+    if (++s.ticks % 10 === 3) console.log(`[vitals] camera rate: ${fps} frames a second`);
+    send(res, 'tick', { left, fps, width: s.frame ? s.frame.width : 0, height: s.frame ? s.frame.height : 0 });
   }, 1000);
-  send(res, 'tick', { left: MAX_SECONDS });
+  send(res, 'tick', { left: MAX_SECONDS, fps: 0, width: 0, height: 0 });
   req.on('close', () => { if (session === s) endSession('Page disconnected'); });
+}
+
+function sendPreview(res) {
+  const img = session && session.frame && toRgba(session.frame, PREVIEW_WIDTH);
+  if (!img) { res.writeHead(204); return res.end(); } // no session, or no picture yet
+  res.writeHead(200, {
+    'Content-Type': 'application/octet-stream',
+    'Cache-Control': 'no-store',
+    'X-Frame-Width': img.width,
+    'X-Frame-Height': img.height,
+  });
+  res.end(img.data);
 }
 
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
   if (req.method === 'GET' && url === '/vitals') return void startSession(req, res);
+  if (req.method === 'GET' && url === '/preview') return sendPreview(res);
   const entry = req.method === 'GET' && STATIC[url];
   if (!entry) { res.writeHead(404); return res.end('Not found'); }
   fs.readFile(path.join(__dirname, entry[0]), (err, data) => {
