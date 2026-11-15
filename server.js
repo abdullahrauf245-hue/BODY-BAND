@@ -16,6 +16,16 @@ const path = require('path');
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_SECONDS = Number(process.env.PRESAGE_MAX_SECONDS) || 120;
 
+// Camera mode asked of the webcam. The SDK needs at least 25 frames a second, and some
+// webcams only reach that below 720p, so the default is 640x480 at 30.
+// Override in .env, for example: PRESAGE_CAMERA=1280x720@30
+const CAMERA_MODE = parseCameraMode(process.env.PRESAGE_CAMERA) || { width: 640, height: 480, fps: 30 };
+
+function parseCameraMode(text) {
+  const m = /^(\d+)x(\d+)@(\d+)$/.exec((text || '').trim());
+  return m ? { width: Number(m[1]), height: Number(m[2]), fps: Number(m[3]) } : null;
+}
+
 // Only these files are ever served (so .env and node_modules stay private).
 const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
@@ -123,12 +133,12 @@ async function startSession(req, res) {
   });
 
   try {
-    sdk.useCamera(CameraSelection.default);
+    sdk.useCamera(CameraSelection.default, CAMERA_MODE);
     sdk.start();
   } catch (e) {
     return endSession('Could not start the camera: ' + e.message);
   }
-  console.log(`[vitals] session started (auto-stops after ${MAX_SECONDS}s)`);
+  console.log(`[vitals] session started (camera ${CAMERA_MODE.width}x${CAMERA_MODE.height}@${CAMERA_MODE.fps}, auto-stops after ${MAX_SECONDS}s)`);
 
   s.timer = setTimeout(() => endSession(`Auto-stopped after ${MAX_SECONDS} seconds`), MAX_SECONDS * 1000);
   s.ticker = setInterval(() => {
