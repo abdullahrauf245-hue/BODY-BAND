@@ -90,6 +90,22 @@ Breath position from the camera: the raw chest trace is scaled to 0..1 using the
 highest values of the last 600 samples, then smoothed. Heartbeats are currently generated
 from the pulse rate; using the real pulse trace for exact beat timing is a planned upgrade.
 
+### Console UI (redesign, 15 Nov)
+
+The interface follows the user's "OP-BIO.1" console design (light, hardware-style). Every
+readout shows a real value; nothing on screen is placeholder data.
+
+| Part | Shows |
+| --- | --- |
+| Telemetry strip | Pulse and beat-to-beat times, breath depth meter, breathing rate and cycle length |
+| Centre dial | Blue arc = how full the breath is; plate = current phase and a live breath trace |
+| MOD-L / MOD-R | The two voices: breath pad (filter opening) and pulse voice (last note played) |
+| MOD-CAM | Camera state, SDK hints and time left |
+| Footer | Start/stop, mute, timer, breathing guide selector |
+
+Breathing guides (4-7-8, box, coherence): the needle on the dial shows where the guide wants
+the breath to be, and the arc shows where it is. The user tries to keep the arc tip on the needle.
+
 ## 8. Non-functional requirements
 
 | Area | Requirement |
