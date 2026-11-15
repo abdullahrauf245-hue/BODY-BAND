@@ -55,14 +55,18 @@
    * Also a nice accessibility mode: anyone can "play" with one input.
    */
   class ManualSource extends SignalSource {
-    constructor() {
+    /** @param {EventTarget} [pressTarget] element that counts as "press to inhale" (default: whole window) */
+    constructor(pressTarget) {
       super();
       this.label = 'Manual (hold Space)';
+      this.pressTarget = pressTarget || window;
       this.pulse = 68; this.breathRate = 0; this.breath = 0;
       this.holding = false; this.cycleStarts = [];
       this.down = (e) => {
-        if (e.type === 'keydown' && (e.code !== 'Space' || e.repeat)) return;
-        if (e.type === 'keydown') e.preventDefault();
+        if (e.type === 'keydown' && e.code !== 'Space') return;
+        if (e.type === 'keydown') e.preventDefault(); // Space must not click a focused button
+        if (e.repeat) return;
+        if (e.type === 'pointerdown' && e.target.closest && e.target.closest('button')) return;
         if (!this.holding) this.cycleStarts.push(performance.now());
         this.holding = true;
       };
@@ -74,14 +78,14 @@
     start() {
       window.addEventListener('keydown', this.down);
       window.addEventListener('keyup', this.up);
-      window.addEventListener('pointerdown', this.down);
+      this.pressTarget.addEventListener('pointerdown', this.down);
       window.addEventListener('pointerup', this.up);
       super.start();
     }
     stop() {
       window.removeEventListener('keydown', this.down);
       window.removeEventListener('keyup', this.up);
-      window.removeEventListener('pointerdown', this.down);
+      this.pressTarget.removeEventListener('pointerdown', this.down);
       window.removeEventListener('pointerup', this.up);
       super.stop();
     }
