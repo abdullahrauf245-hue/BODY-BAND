@@ -198,7 +198,44 @@
     </div>
   </footer>
 
+  <!-- CAMERA CHECK: consent + free rehearsal before every SmartSpectra session -->
+  <dialog id="camCheck" class="cc" aria-labelledby="ccTitle">
+    <div class="cc-head">
+      <span><span class="sq cy"></span><span class="ch strong">CAMERA CHECK</span></span>
+      <span class="mini-chip">FREE · USES NO SDK MINUTES</span>
+    </div>
+    <div class="cc-body">
+      <div class="cc-view">
+        <video id="ccVideo" muted playsinline></video>
+        <svg class="cc-guide" viewBox="0 0 160 120" aria-hidden="true">
+          <ellipse cx="80" cy="44" rx="16" ry="20"/>
+          <path d="M34,120 C36,90 56,74 80,74 C104,74 124,90 126,120"/>
+        </svg>
+        <div class="cc-msg" id="ccMsg" role="status">ASKING FOR THE CAMERA…</div>
+      </div>
+      <div class="cc-side">
+        <h2 id="ccTitle">Before the camera starts</h2>
+        <ul>
+          <li><b>What happens.</b> The Presage SmartSpectra SDK reads your webcam on this PC to measure your pulse and breathing. It stops by itself after 2 minutes, or when you press Stop.</li>
+          <li><b>What it costs.</b> Each camera session uses some of your free SDK minutes. This check does not.</li>
+          <li><b>Your data.</b> Body Band stores no video and no readings, and sends nothing anywhere itself. The SDK contacts Presage to check your API key, count usage and fetch its models. Its telemetry reports are turned off.</li>
+        </ul>
+        <div class="rows">
+          <div><span>CAMERA FRAME RATE</span><b id="ccFps">--</b></div>
+          <div><span>LIGHT</span><b id="ccLight">--</b></div>
+          <div><span>SDK NEEDS</span><b>25+ FPS</b></div>
+        </div>
+        <p class="cc-tip">Face a light, sit back so your head and chest fit the outline, and keep still.</p>
+      </div>
+    </div>
+    <div class="cc-foot">
+      <button class="key" id="ccCancel">CANCEL</button>
+      <button class="cta" id="ccStart"><span class="led" id="ccLed"></span><span id="ccStartText">START MEASURING</span></button>
+    </div>
+  </dialog>
+
   <script src="signals.js"></script>
+  <script src="camcheck.js"></script>
   <script src="audio.js"></script>
   <script src="camview.js"></script>
   <script src="app.js"></script>

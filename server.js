@@ -38,6 +38,7 @@ const STATIC = {
   '/audio.js': ['audio.js', 'text/javascript; charset=utf-8'],
   '/signals.js': ['signals.js', 'text/javascript; charset=utf-8'],
   '/camview.js': ['camview.js', 'text/javascript; charset=utf-8'],
+  '/camcheck.js': ['camcheck.js', 'text/javascript; charset=utf-8'],
 };
 const PREVIEW_WIDTH = 320; // pixels; plenty for the small camera panel
 
