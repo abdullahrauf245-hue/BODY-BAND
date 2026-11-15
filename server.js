@@ -39,6 +39,9 @@ const STATIC = {
   '/signals.js': ['signals.js', 'text/javascript; charset=utf-8'],
   '/camview.js': ['camview.js', 'text/javascript; charset=utf-8'],
   '/camcheck.js': ['camcheck.js', 'text/javascript; charset=utf-8'],
+  '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
+  '/favicon.ico': ['favicon.ico', 'image/x-icon'],
+  '/apple-touch-icon.png': ['apple-touch-icon.png', 'image/png'],
 };
 const PREVIEW_WIDTH = 320; // pixels; plenty for the small camera panel
 
