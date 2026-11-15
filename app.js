@@ -1,159 +1,274 @@
+/* BODYBAND console: wires a signal source to the music engine and the on-screen instruments. */
 (function () {
   const $ = (id) => document.getElementById(id);
-  const canvas = $('stage');
-  const ctx = canvas.getContext('2d');
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ARC_LEN = 2 * Math.PI * 195; // length of the breath arc on the dial
+  const CAMERA_LIMIT = 120;          // seconds, matches server.js
+
+  const SOURCES = {
+    sim: { chip: 'SENSOR: SIMULATED', label: 'SOURCE: SIMULATED BODY' },
+    manual: { chip: 'SENSOR: MANUAL', label: 'SOURCE: MANUAL — HOLD SPACE OR PRESS THE STAGE TO INHALE' },
+    presage: { chip: 'SENSOR: CAMERA', label: 'SOURCE: SMARTSPECTRA CAMERA' },
+  };
+
+  // Breathing guides: [label, seconds] steps. The needle shows the guide; the arc shows you.
+  const PACERS = {
+    free: null,
+    relax: [['INHALE', 4], ['HOLD', 7], ['EXHALE', 8]],
+    box: [['INHALE', 4], ['HOLD', 4], ['EXHALE', 4], ['HOLD', 4]],
+    coherence: [['INHALE', 5.5], ['EXHALE', 5.5]],
+  };
 
   let source = null, band = null, unsub = null;
-  const state = { pulse: 0, breathRate: 0, breath: 0, prevBreath: 0, ripples: [], beatGlow: 0, live: false };
+  let selected = 'sim', pacer = 'free';
+  const st = {};
 
-  // ---------- canvas ----------
-  function resize() {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    canvas.width = innerWidth * dpr;
-    canvas.height = innerHeight * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  function resetState() {
+    Object.assign(st, {
+      breath: 0, pulse: 0, breathRate: 0, vel: 0, lastT: 0,
+      phase: 'HOLD', cand: 'HOLD', candT: 0, phaseStart: 0, cycles: 0,
+      beatGlow: 0, lastBeat: 0, intervals: [], hist: [], frame: 0, startT: 0, left: null,
+    });
   }
-  addEventListener('resize', resize);
-  resize();
+  resetState();
 
-  // drifting dust in the background
-  const dust = Array.from({ length: 90 }, () => ({
-    x: Math.random(), y: Math.random(), r: Math.random() * 1.6 + 0.3, s: Math.random() * 0.02 + 0.004,
-  }));
+  // ---------- one-time build ----------
+  const ticks = $('ticks');
+  for (let a = 10; a < 360; a += 10) {
+    if (a % 90 === 0) continue;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 250); l.setAttribute('x2', 250); l.setAttribute('y1', 20); l.setAttribute('y2', 25);
+    l.setAttribute('transform', `rotate(${a} 250 250)`);
+    ticks.appendChild(l);
+  }
+  const segs = Array.from({ length: 16 }, () => $('depthBar').appendChild(document.createElement('i')));
+  $('arc').setAttribute('stroke-dasharray', ARC_LEN);
 
-  function draw() {
-    const w = innerWidth, h = innerHeight, cx = w / 2, cy = h * 0.45;
-    const base = Math.min(w, h) * 0.14;
-    const b = state.live ? state.breath : 0.5 + 0.5 * Math.sin(performance.now() / 2200) * 0.3;
+  const cameraAvailable = location.protocol.startsWith('http');
+  if (cameraAvailable) {
+    $('camSourceBtn').disabled = false;
+    $('camSourceBtn').title = 'Real pulse and breathing from the camera (uses free minutes)';
+    $('useCamBtn').disabled = false;
+  } else {
+    $('camHint').textContent = 'RUN "NPM START" TO ENABLE';
+  }
 
-    ctx.fillStyle = 'rgba(7,7,13,0.35)';
-    ctx.fillRect(0, 0, w, h);
+  // ---------- helpers ----------
+  const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-    // dust rises when inhaling, sinks when exhaling
-    const drift = state.breath - state.prevBreath;
-    ctx.fillStyle = 'rgba(236,235,245,0.35)';
-    for (const d of dust) {
-      d.y -= d.s * 0.016 + drift * 0.4 * d.s * 30;
-      if (d.y < 0) d.y += 1; if (d.y > 1) d.y -= 1;
-      ctx.beginPath();
-      ctx.arc(d.x * w, d.y * h, d.r, 0, Math.PI * 2);
-      ctx.fill();
+  /** Where the breathing guide is at time t: what to do, and how full the lungs should be (0..1). */
+  function guideAt(steps, t) {
+    const total = steps.reduce((a, s) => a + s[1], 0);
+    let x = t % total, level = 0;
+    for (const [label, secs] of steps) {
+      if (x < secs) {
+        const p = x / secs;
+        if (label === 'INHALE') level = p;
+        else if (label === 'EXHALE') level = 1 - p;
+        return { label, level, left: secs - x };
+      }
+      x -= secs;
+      if (label === 'INHALE') level = 1;
+      else if (label === 'EXHALE') level = 0;
+    }
+    return { label: steps[0][0], level: 0, left: 0 };
+  }
+
+  function setPressed(selector, attr, value) {
+    document.querySelectorAll(selector).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === value)));
+  }
+
+  function selectSource(name) {
+    if (source) return; // locked while a session runs
+    selected = name;
+    setPressed('[data-source]', 'source', name);
+    $('subSource').textContent = SOURCES[name].label;
+  }
+
+  function setMuted(m) {
+    if (band) band.setMuted(m);
+    $('muteBtn').setAttribute('aria-pressed', String(m));
+    $('muteSlash').setAttribute('visibility', m ? 'visible' : 'hidden');
+    $('outBtn').textContent = m ? 'MUTED' : 'ENGAGED';
+    $('outBtn').classList.toggle('off', m);
+  }
+
+  // ---------- drawing ----------
+  function drawDial(guide) {
+    const b = st.breath;
+    $('arc').setAttribute('stroke-dashoffset', ARC_LEN * (1 - b));
+    $('needle').style.transform = `rotate(${(guide ? guide.level : b) * 360}deg)`;
+    const pulse = reduceMotion ? 0 : st.beatGlow * 0.015;
+    $('plate').style.transform = `scale(${0.96 + b * 0.07 + pulse})`;
+
+    const lit = Math.round(b * 16);
+    segs.forEach((s, i) => { s.className = i < lit - 1 ? 'on' : i === lit - 1 ? 'tip' : ''; });
+
+    if (st.frame % 2 === 0) {
+      st.hist.push(b);
+      if (st.hist.length > 120) st.hist.shift();
+      $('wave').setAttribute('points', st.hist.map((v, i) => `${(i * 160 / 119).toFixed(1)},${(26 - v * 22).toFixed(1)}`).join(' '));
+    }
+  }
+
+  function drawText(now, guide) {
+    $('bpm').textContent = st.pulse ? Math.round(st.pulse) : '--';
+    $('rpm').textContent = st.breathRate ? st.breathRate.toFixed(1) : '--';
+    $('cycleSec').textContent = st.breathRate ? `${(60 / st.breathRate).toFixed(1)} s / CYCLE` : '-- s / CYCLE';
+    $('cycleCount').textContent = `CYCLES: ${st.cycles}`;
+    $('depthPct').textContent = `${Math.round(st.breath * 100)}%`;
+    $('phaseTag').textContent = st.phase;
+    $('plateLeft').textContent = `CYCLE: ${String(st.cycles).padStart(2, '0')}`;
+
+    if (guide) {
+      $('phase').textContent = guide.label;
+      $('guideTag').textContent = `YOU: ${st.phase}`;
+      $('phaseLabel').textContent = 'NEXT STEP IN';
+      $('phaseTime').textContent = `${guide.left.toFixed(1)}s`;
+    } else {
+      $('phase').textContent = st.phase;
+      $('guideTag').textContent = 'FREE';
+      $('phaseLabel').textContent = 'PHASE TIME';
+      $('phaseTime').textContent = `${(now - st.phaseStart).toFixed(1)}s`;
     }
 
-    // heartbeat ripples
-    for (const r of state.ripples) {
-      r.age += 0.016;
-      const rad = base * (1 + b * 0.9) + r.age * base * 2.2;
-      const alpha = Math.max(0, 0.5 - r.age * 0.4);
-      ctx.strokeStyle = `rgba(255,107,139,${alpha})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-      ctx.stroke();
+    if (band) {
+      $('cutoffVal').textContent = `${Math.round(band.cutoff || 220)} Hz`;
+      $('padKnob').style.setProperty('--turn', `${-135 + st.breath * 270}deg`);
+      if (band.lastNote) {
+        $('noteName').textContent = band.lastNote.name;
+        $('noteHz').textContent = `${band.lastNote.hz.toFixed(1)} Hz`;
+        $('noteBar').style.width = `${Math.round(band.lastNote.level * 100)}%`;
+      }
     }
-    state.ripples = state.ripples.filter((r) => r.age < 1.3);
-
-    // breathing orb
-    const rad = base * (1 + b * 0.9) * (1 + state.beatGlow * 0.04);
-    const g = ctx.createRadialGradient(cx, cy, rad * 0.1, cx, cy, rad * 1.6);
-    g.addColorStop(0, `rgba(255,255,255,${0.55 + state.beatGlow * 0.3})`);
-    g.addColorStop(0.35, `rgba(107,227,255,${0.35 + b * 0.35})`);
-    g.addColorStop(0.7, `rgba(255,107,139,${0.12 + state.beatGlow * 0.25})`);
-    g.addColorStop(1, 'rgba(7,7,13,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(cx, cy, rad * 1.6, 0, Math.PI * 2);
-    ctx.fill();
-
-    state.beatGlow *= 0.9;
-    state.prevBreath = state.breath;
-    requestAnimationFrame(draw);
-  }
-  requestAnimationFrame(draw);
-
-  // ---------- HUD ----------
-  let hudTick = 0;
-  function updateHud() {
-    if (++hudTick % 10) return; // ~6x per second is plenty
-    $('bpm').textContent = state.pulse ? Math.round(state.pulse) : '--';
-    $('rpm').textContent = state.breathRate ? state.breathRate.toFixed(1) : '--';
-    const rising = state.breath - state.prevBreath > 0.0005;
-    const falling = state.breath - state.prevBreath < -0.0005;
-    $('cue').textContent = rising ? 'Breathe in' : falling ? 'Breathe out' : 'Hold';
+    $('elapsed').textContent = mmss(now - st.startT);
+    if (st.left !== null) $('camLeft').textContent = mmss(st.left);
   }
 
-  // ---------- lifecycle ----------
+  function onFrame(e) {
+    const now = performance.now() / 1000;
+    const dt = Math.max(now - st.lastT, 0.001);
+    st.lastT = now;
+
+    // which way is the breath going? (smoothed, and a change must hold for 0.2s to count)
+    st.vel += ((e.breath - st.breath) / dt - st.vel) * 0.15;
+    const cand = st.vel > 0.04 ? 'INHALING' : st.vel < -0.04 ? 'EXHALING' : 'HOLD';
+    if (cand !== st.cand) { st.cand = cand; st.candT = now; }
+    else if (cand !== st.phase && now - st.candT > 0.2) {
+      st.phase = cand; st.phaseStart = now;
+      if (cand === 'INHALING') st.cycles++;
+    }
+
+    st.breath = e.breath; st.pulse = e.pulse; st.breathRate = e.breathRate;
+    st.beatGlow *= 0.9;
+    st.frame++;
+    band.setBreath(e.breath);
+
+    const steps = PACERS[pacer];
+    const guide = steps ? guideAt(steps, now - st.startT) : null;
+    drawDial(guide);
+    if (st.frame % 6 === 0) drawText(now, guide);
+  }
+
+  function onBeat() {
+    const now = performance.now();
+    if (st.lastBeat) {
+      st.intervals.push(Math.round(now - st.lastBeat));
+      if (st.intervals.length > 3) st.intervals.shift();
+      $('ibi').innerHTML = `${st.intervals.join(' | ')} <b>ms</b>`;
+    }
+    st.lastBeat = now;
+    st.beatGlow = 1;
+    $('beatLed').classList.add('on');
+    setTimeout(() => $('beatLed').classList.remove('on'), 90);
+    band.beat(st.pulse);
+  }
+
+  // ---------- session ----------
+  function showLive(live) {
+    const cam = live && selected === 'presage';
+    $('ctaText').textContent = live ? 'STOP SESSION' : 'START SESSION';
+    $('ctaLed').className = live ? 'led red' : 'led off';
+    $('playIcon').innerHTML = live ? '<rect x="5" y="5" width="14" height="14"/>' : '<path d="M7 4l13 8-13 8z"/>';
+    $('playBtn').setAttribute('aria-label', live ? 'Stop session' : 'Start session');
+    $('sensorChip').textContent = live ? SOURCES[selected].chip : 'SENSOR: IDLE';
+    $('engine').textContent = live ? 'AUDIO ENGINE ONLINE' : 'AUDIO ENGINE IDLE';
+    $('limit').textContent = cam ? mmss(CAMERA_LIMIT) : '--:--';
+    $('camText').textContent = cam ? 'CAM FEED: ACTIVE' : 'CAM FEED: OFF';
+    $('camLed').className = cam ? 'led' : 'led off';
+    $('camStateLed').className = cam ? 'led' : 'led off';
+    $('camStateText').textContent = cam ? 'ONLINE' : 'STANDBY';
+    $('camState').classList.toggle('live', cam);
+    if (cameraAvailable) $('camHint').textContent = cam ? 'STARTING…' : 'CAMERA OFF';
+    document.querySelectorAll('[data-source]').forEach((b) => {
+      b.disabled = live || (b.dataset.source === 'presage' && !cameraAvailable);
+    });
+    $('useCamBtn').disabled = live || !cameraAvailable;
+  }
+
   async function begin() {
-    const pick = document.querySelector('input[name="source"]:checked').value;
-    source = pick === 'manual' ? new Signals.ManualSource()
-      : pick === 'presage' ? new Signals.PresageSource()
+    if (source) return;
+    resetState();
+    if (document.activeElement) document.activeElement.blur();
+    source = selected === 'manual' ? new Signals.ManualSource($('stage'))
+      : selected === 'presage' ? new Signals.PresageSource()
       : new Signals.SimulatedSource();
-    $('notice').textContent = '';
+    $('subNotice').textContent = 'RUNNING';
     band = new BodyBand();
     await band.start();
+    setMuted($('muteBtn').getAttribute('aria-pressed') === 'true');
+    $('sampleRate').textContent = `${(band.ctx.sampleRate / 1000).toFixed(1)} kHz`;
+
+    st.startT = st.lastT = st.phaseStart = performance.now() / 1000;
+    showLive(true);
 
     unsub = source.on((e) => {
-      if (e.type === 'frame') {
-        state.pulse = e.pulse; state.breathRate = e.breathRate; state.breath = e.breath;
-        band.setBreath(e.breath);
-        updateHud();
-      } else if (e.type === 'beat') {
-        state.beatGlow = 1;
-        if (!reduceMotion) state.ripples.push({ age: 0 });
-        band.beat(state.pulse);
-      } else if (e.type === 'status') {
-        $('hint').textContent = e.text;
-        $('hint').hidden = !e.text;
-      } else if (e.type === 'time') {
-        const m = Math.floor(e.left / 60), s = String(e.left % 60).padStart(2, '0');
-        $('sourceTag').textContent = `${source.label} · ${m}:${s} left`;
-      } else if (e.type === 'ended') {
-        end(e.reason);
-      }
+      if (e.type === 'frame') onFrame(e);
+      else if (e.type === 'beat') onBeat();
+      else if (e.type === 'status') {
+        $('camHint').textContent = e.text || 'READING VITALS';
+        $('subNotice').textContent = e.text || 'RUNNING';
+      } else if (e.type === 'time') st.left = e.left;
+      else if (e.type === 'ended') end(e.reason);
     });
     source.start();
-    state.live = true;
-
-    $('sourceTag').textContent = source.label;
-    $('intro').hidden = true;
-    $('hud').hidden = false;
   }
 
   async function end(reason) {
     if (!source) return;
-    $('notice').textContent = typeof reason === 'string' ? reason : '';
-    $('hint').hidden = true;
-    state.live = false;
     if (unsub) unsub();
     source.stop();
     const b = band;
     source = band = unsub = null;
+    showLive(false);
+    $('subNotice').textContent = typeof reason === 'string' ? reason : 'STOPPED';
+    $('phase').textContent = 'STANDBY';
+    $('phaseTag').textContent = 'STANDBY';
+    $('guideTag').textContent = pacer === 'free' ? 'FREE' : 'GUIDE SET';
+    $('camLeft').textContent = '--:--';
+    $('phaseLabel').textContent = 'PHASE TIME';
+    $('phaseTime').textContent = '-.-s';
+    $('arc').setAttribute('stroke-dashoffset', ARC_LEN);
+    $('needle').style.transform = 'rotate(0deg)';
+    $('plate').style.transform = '';
+    segs.forEach((s) => { s.className = ''; });
     if (b) await b.stop();
-    Object.assign(state, { pulse: 0, breathRate: 0, ripples: [] });
-    $('mute').textContent = 'Mute';
-    $('mute').setAttribute('aria-pressed', 'false');
-    $('hud').hidden = true;
-    $('intro').hidden = false;
   }
 
-  // The camera mode needs server.js (npm start); it can't work from a double-clicked file.
-  if (location.protocol.startsWith('http')) {
-    $('presageOption').classList.remove('disabled');
-    $('presageOption').querySelector('input').disabled = false;
-    $('presageNote').textContent = '(real pulse + breathing · uses free minutes · auto-stops after 2 min)';
-  }
+  const toggle = () => (source ? end() : begin());
 
-  $('begin').addEventListener('click', begin);
-  $('stop').addEventListener('click', (e) => { e.stopPropagation(); end(); });
-  $('mute').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const m = !band.muted;
-    band.setMuted(m);
-    $('mute').textContent = m ? 'Unmute' : 'Mute';
-    $('mute').setAttribute('aria-pressed', String(m));
-  });
-  // HUD buttons shouldn't count as "inhale" presses in manual mode
-  $('hud').addEventListener('pointerdown', (e) => e.stopPropagation());
-  $('hud').addEventListener('pointerup', (e) => e.stopPropagation());
+  // ---------- controls ----------
+  $('arc').setAttribute('stroke-dashoffset', ARC_LEN);
+  showLive(false);
+  $('cta').addEventListener('click', toggle);
+  $('playBtn').addEventListener('click', toggle);
+  $('muteBtn').addEventListener('click', () => setMuted($('muteBtn').getAttribute('aria-pressed') !== 'true'));
+  $('outBtn').addEventListener('click', () => setMuted($('muteBtn').getAttribute('aria-pressed') !== 'true'));
+  $('useCamBtn').addEventListener('click', () => selectSource('presage'));
+  document.querySelectorAll('[data-source]').forEach((b) => b.addEventListener('click', () => selectSource(b.dataset.source)));
+  document.querySelectorAll('[data-pacer]').forEach((b) => b.addEventListener('click', () => {
+    pacer = b.dataset.pacer;
+    setPressed('[data-pacer]', 'pacer', pacer);
+    if (!source) $('guideTag').textContent = pacer === 'free' ? 'FREE' : 'GUIDE SET';
+  }));
 })();
