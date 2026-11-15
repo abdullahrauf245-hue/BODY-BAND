@@ -3,47 +3,198 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Body Band — music from your heartbeat and breath</title>
+  <title>BODYBAND / OP-BIO.1 — music from your heartbeat and breath</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <canvas id="stage" aria-hidden="true"></canvas>
 
-  <!-- Intro screen -->
-  <section id="intro" class="panel intro">
-    <p class="eyebrow">Presage SmartSpectra · prototype</p>
-    <h1>Body Band</h1>
-    <p class="lede">Your heartbeat sets the rhythm. Your breath shapes the sound.<br>Sit still, face the camera, and just breathe.</p>
-    <div class="source-pick" role="radiogroup" aria-label="Signal source">
-      <label><input type="radio" name="source" value="sim" checked> Simulated body <small>(demo, no camera)</small></label>
-      <label><input type="radio" name="source" value="manual"> Manual <small>(hold Space / press screen to inhale)</small></label>
-      <label class="disabled" id="presageOption"><input type="radio" name="source" value="presage" disabled> SmartSpectra camera <small id="presageNote">(start with "npm start" to use)</small></label>
+  <!-- HEADER -->
+  <header class="bar top">
+    <div class="brand">
+      <span class="led" id="powerLed"></span>
+      <span class="logo">BODYBAND</span>
+      <span class="model">/ OP-BIO.1</span>
+      <span class="sep"></span>
+      <span class="chip" id="sensorChip">SENSOR: IDLE</span>
     </div>
-    <button id="begin" class="btn">Begin</button>
-    <p id="notice" class="notice" role="status"></p>
+
+    <nav class="seg" aria-label="Signal source">
+      <button data-source="sim" aria-pressed="true">SIMULATED</button>
+      <button data-source="manual" aria-pressed="false">MANUAL</button>
+      <button data-source="presage" aria-pressed="false" id="camSourceBtn" disabled title="Start the app with npm start to use the camera">CAMERA</button>
+    </nav>
+
+    <div class="specs">
+      <span class="chip" id="camChip"><span class="led off" id="camLed"></span><span id="camText">CAM FEED: OFF</span></span>
+      <span class="sep wide"></span>
+      <span class="wide"><b id="sampleRate">--.- kHz</b> <span class="dim">/ WEB AUDIO</span></span>
+      <span class="bars wide" aria-hidden="true"><i></i><i></i><i class="cy"></i></span>
+    </div>
+  </header>
+
+  <!-- TELEMETRY STRIP -->
+  <section class="strip" aria-label="Live readings">
+    <div class="cell">
+      <div>
+        <div class="cell-head"><span class="ch">CH 01</span><span class="name">CARDIAC RATE</span></div>
+        <div class="big"><span class="num" id="bpm">--</span><span class="unit">BPM</span></div>
+      </div>
+      <div class="cell-side">
+        <span class="tag"><span class="sq" id="beatLed"></span>BEAT</span>
+        <div class="small" id="ibi">-- | -- | -- <b>ms</b></div>
+      </div>
+    </div>
+
+    <div class="cell col">
+      <div class="cell-head spread">
+        <span><span class="ch">CH 02</span><span class="name">BREATH DEPTH</span></span>
+        <span class="accent" id="phaseTag">STANDBY</span>
+      </div>
+      <div class="depth">
+        <span class="num mid" id="depthPct">--%</span>
+        <div class="ladder" id="depthBar" role="img" aria-label="Breath depth meter"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div>
+        <div class="cell-head"><span class="ch">CH 03</span><span class="name">BREATHING RATE</span></div>
+        <div class="big"><span class="num" id="rpm">--</span><span class="unit">/MIN</span></div>
+      </div>
+      <div class="cell-side">
+        <span class="tag" id="cycleSec">-- s / CYCLE</span>
+        <div class="small" id="cycleCount">CYCLES: 0</div>
+      </div>
+    </div>
   </section>
 
-  <!-- Live HUD -->
-  <p id="hint" class="hint" role="status" hidden></p>
-  <section id="hud" class="hud" hidden>
-    <div class="stat">
-      <span class="label">Pulse</span>
-      <span class="value"><b id="bpm">--</b> bpm</span>
+  <!-- MAIN STAGE -->
+  <main class="stage" id="stage">
+
+    <aside class="module mod-l">
+      <div class="mod-head"><span class="ch">MOD-L</span><span class="sq dark"></span></div>
+      <div>
+        <div class="mod-title">BREATH PAD</div>
+        <div class="mod-sub">A2 110.00 Hz // SAW + TRI</div>
+      </div>
+      <div class="knob-wrap">
+        <div class="knob" id="padKnob"><span class="knob-mark"></span><span class="knob-cap" id="cutoffVal">-- Hz</span></div>
+        <div class="knob-scale"><span>CLOSED</span><span>OPEN</span></div>
+      </div>
+      <div class="mod-foot"><span>OUTPUT</span><button class="key dark" id="outBtn">ENGAGED</button></div>
+    </aside>
+
+    <div class="dial-wrap">
+      <div class="dial">
+        <svg class="ring" viewBox="0 0 500 500" aria-hidden="true">
+          <circle cx="250" cy="250" r="235" fill="none" stroke="#D8D8D3"/>
+          <circle cx="250" cy="250" r="215" fill="none" stroke="#E5E5E2" stroke-dasharray="2 4" stroke-width=".75"/>
+          <g stroke="#111" stroke-width="1.5">
+            <line x1="250" y1="10" x2="250" y2="28"/><line x1="250" y1="472" x2="250" y2="490"/>
+            <line x1="10" y1="250" x2="28" y2="250"/><line x1="472" y1="250" x2="490" y2="250"/>
+          </g>
+          <g class="ring-text">
+            <text x="250" y="44" text-anchor="middle">0% / EMPTY</text>
+            <text x="422" y="253" text-anchor="middle">25%</text>
+            <text x="250" y="464" text-anchor="middle">50%</text>
+            <text x="78" y="253" text-anchor="middle">75%</text>
+          </g>
+          <g id="ticks" stroke="#888884" stroke-width=".8" opacity=".6"></g>
+          <circle cx="250" cy="250" r="195" fill="none" stroke="#E5E5E2" stroke-width="3"/>
+          <circle id="arc" cx="250" cy="250" r="195" fill="none" stroke="#00A3FF" stroke-width="3" transform="rotate(-90 250 250)"/>
+          <line id="needle" x1="250" y1="55" x2="250" y2="85" stroke="#00A3FF" stroke-width="2"/>
+        </svg>
+
+        <div class="plate" id="plate">
+          <div class="plate-row top"><span id="plateLeft">CYCLE: 00</span><span class="accent" id="guideTag">FREE</span></div>
+          <div class="plate-mid">
+            <span class="directive">PHASE DIRECTIVE</span>
+            <h1 id="phase">STANDBY</h1>
+          </div>
+          <svg class="wave" viewBox="0 0 160 30" aria-hidden="true">
+            <line x1="0" y1="15" x2="160" y2="15" stroke="#E5E5E2" stroke-dasharray="2 2"/>
+            <polyline id="wave" fill="none" stroke="#00A3FF" stroke-width="1.75" points=""/>
+          </svg>
+          <div class="plate-row bottom"><span id="phaseLabel">PHASE TIME</span><span class="box" id="phaseTime">-.-s</span></div>
+        </div>
+      </div>
     </div>
-    <div class="stat">
-      <span class="label">Breathing</span>
-      <span class="value"><b id="rpm">--</b> /min</span>
+
+    <aside class="module mod-cam">
+      <div class="mod-head">
+        <span><span class="sq cy"></span><span class="ch strong">MOD-CAM</span></span>
+        <span class="mini-chip">OPT-01</span>
+      </div>
+      <div>
+        <div class="mod-title">OPTICAL SENSOR</div>
+        <div class="mod-sub tiny">PRESAGE SMARTSPECTRA // PULSE + BREATH</div>
+      </div>
+      <div class="viewfinder">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" aria-hidden="true">
+          <circle cx="50" cy="32" r="16" stroke-dasharray="2 2"/>
+          <path d="M20,88 C22,65 34,54 50,54 C66,54 78,65 80,88" stroke-dasharray="3 2"/>
+        </svg>
+        <div class="vf-hint" id="camHint" role="status">CAMERA OFF</div>
+        <div class="vf-tag">NO VIDEO STORED BY BODY BAND</div>
+      </div>
+      <div class="rows">
+        <div><span>SESSION CAP</span><b>02:00 AUTO-STOP</b></div>
+        <div><span>TIME LEFT</span><b id="camLeft">--:--</b></div>
+      </div>
+      <div class="mod-foot split">
+        <span class="key state" id="camState"><span class="led off" id="camStateLed"></span><span id="camStateText">STANDBY</span></span>
+        <button class="key" id="useCamBtn" disabled>USE CAMERA</button>
+      </div>
+    </aside>
+
+    <aside class="module mod-r">
+      <div class="mod-head"><span class="ch">MOD-R</span><span class="sq cy"></span></div>
+      <div>
+        <div class="mod-title">PULSE VOICE</div>
+        <div class="mod-sub">A MINOR // PENTATONIC</div>
+      </div>
+      <div class="meter">
+        <div class="meter-head"><span>LAST NOTE</span><b id="noteName">--</b></div>
+        <div class="meter-bar"><i id="noteBar"></i></div>
+        <div class="meter-scale"><span>LOW</span><span id="noteHz">--- Hz</span><span>HIGH</span></div>
+      </div>
+      <div class="mod-foot"><span>TRIGGER</span><span class="key">1 / BEAT</span></div>
+    </aside>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="deck">
+    <div class="deck-row">
+      <div class="transport">
+        <button class="icon-btn" id="playBtn" title="Start / stop session" aria-label="Start session">
+          <svg viewBox="0 0 24 24" id="playIcon"><path d="M7 4l13 8-13 8z"/></svg>
+        </button>
+        <button class="icon-btn" id="muteBtn" title="Mute / unmute" aria-label="Mute" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path id="muteSlash" d="M16 9l5 6m0-6l-5 6" stroke="currentColor" stroke-width="2" fill="none" visibility="hidden"/></svg>
+        </button>
+        <span class="sep"></span>
+        <div class="timer"><b id="elapsed">00:00</b><span class="dim">/</span><span id="limit">--:--</span></div>
+      </div>
+
+      <div class="seg light" aria-label="Breathing guide">
+        <button data-pacer="free" aria-pressed="true">FREE</button>
+        <button data-pacer="relax" aria-pressed="false">4-7-8 RELAX</button>
+        <button data-pacer="box" aria-pressed="false">BOX 4-4-4-4</button>
+        <button data-pacer="coherence" aria-pressed="false">COHERENCE 5.5s</button>
+      </div>
+
+      <button class="cta" id="cta"><span class="led off" id="ctaLed"></span><span id="ctaText">START SESSION</span></button>
     </div>
-    <div class="stat breath-cue">
-      <span class="label">Now</span>
-      <span class="value" id="cue">—</span>
+
+    <div class="sub-row">
+      <div><span id="subSource">SOURCE: SIMULATED BODY</span><span class="bar-sep">|</span><span id="subNotice" role="status">READY</span></div>
+      <div><span class="sq green" id="engineLed"></span><span class="strong" id="engine">AUDIO ENGINE IDLE</span></div>
     </div>
-    <div class="controls">
-      <span class="source-tag" id="sourceTag"></span>
-      <button id="mute" class="btn ghost" aria-pressed="false">Mute</button>
-      <button id="stop" class="btn ghost">Stop</button>
-    </div>
-  </section>
+  </footer>
 
   <script src="signals.js"></script>
   <script src="audio.js"></script>
