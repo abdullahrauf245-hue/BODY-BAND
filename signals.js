@@ -102,5 +102,54 @@
     }
   }
 
-  window.Signals = { SimulatedSource, ManualSource };
+  /**
+   * Real vitals from the SmartSpectra SDK, streamed by server.js (npm start).
+   * Extra events: { type: 'status', text } camera hints, { type: 'time', left }
+   * seconds remaining, { type: 'ended', reason } when the session is over.
+   */
+  class PresageSource extends SignalSource {
+    constructor() {
+      super();
+      this.label = 'SmartSpectra camera';
+      this.pulse = 0; this.breathRate = 0; this.breath = 0;
+      this.target = 0; this.window = [];
+    }
+    start() {
+      const es = (this.es = new EventSource('/vitals'));
+      es.addEventListener('vitals', (e) => {
+        const d = JSON.parse(e.data);
+        if (d.pulse) this.pulse = d.pulse;
+        if (d.breathRate) this.breathRate = d.breathRate;
+        if (d.trace && d.trace.length) {
+          // scale the raw chest trace to 0..1 using the last few breaths
+          this.window.push(...d.trace);
+          if (this.window.length > 600) this.window.splice(0, this.window.length - 600);
+          const min = Math.min(...this.window), max = Math.max(...this.window);
+          if (max - min > 1e-6) this.target = (d.trace[d.trace.length - 1] - min) / (max - min);
+        }
+      });
+      es.addEventListener('status', (e) => this.emit({ type: 'status', text: JSON.parse(e.data).text }));
+      es.addEventListener('tick', (e) => this.emit({ type: 'time', left: JSON.parse(e.data).left }));
+      es.addEventListener('ended', (e) => {
+        es.close();
+        this.emit({ type: 'ended', reason: JSON.parse(e.data).reason });
+      });
+      // Never let the browser auto-reconnect: that would silently start a new session.
+      es.onerror = () => {
+        if (es.readyState === EventSource.CLOSED) return;
+        es.close();
+        this.emit({ type: 'ended', reason: 'Lost connection to the Body Band server' });
+      };
+      super.start();
+    }
+    stop() {
+      if (this.es) this.es.close();
+      super.stop();
+    }
+    update(dt) {
+      this.breath += (this.target - this.breath) * Math.min(1, dt * 6);
+    }
+  }
+
+  window.Signals = { SimulatedSource, ManualSource, PresageSource };
 })();
