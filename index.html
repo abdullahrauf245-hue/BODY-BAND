@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Body Band — music from your heartbeat and breath</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="stage" aria-hidden="true"></canvas>
+
+  <!-- Intro screen -->
+  <section id="intro" class="panel intro">
+    <p class="eyebrow">Presage SmartSpectra · prototype</p>
+    <h1>Body Band</h1>
+    <p class="lede">Your heartbeat sets the rhythm. Your breath shapes the sound.<br>Sit still, face the camera, and just breathe.</p>
+    <div class="source-pick" role="radiogroup" aria-label="Signal source">
+      <label><input type="radio" name="source" value="sim" checked> Simulated body <small>(demo, no camera)</small></label>
+      <label><input type="radio" name="source" value="manual"> Manual <small>(hold Space / press screen to inhale)</small></label>
+      <label class="disabled"><input type="radio" name="source" value="presage" disabled> SmartSpectra camera <small>(coming next)</small></label>
+    </div>
+    <button id="begin" class="btn">Begin</button>
+  </section>
+
+  <!-- Live HUD -->
+  <section id="hud" class="hud" hidden>
+    <div class="stat">
+      <span class="label">Pulse</span>
+      <span class="value"><b id="bpm">--</b> bpm</span>
+    </div>
+    <div class="stat">
+      <span class="label">Breathing</span>
+      <span class="value"><b id="rpm">--</b> /min</span>
+    </div>
+    <div class="stat breath-cue">
+      <span class="label">Now</span>
+      <span class="value" id="cue">—</span>
+    </div>
+    <div class="controls">
+      <span class="source-tag" id="sourceTag"></span>
+      <button id="mute" class="btn ghost" aria-pressed="false">Mute</button>
+      <button id="stop" class="btn ghost">Stop</button>
+    </div>
+  </section>
+
+  <script src="signals.js"></script>
+  <script src="audio.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
