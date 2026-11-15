@@ -33,6 +33,8 @@ runtime (a recent version that includes `VCRUNTIME140_THREADS.dll`).
 | File | Job |
 | --- | --- |
 | `server.js` | Serves the page; runs one SmartSpectra camera session and streams it |
+| `preview.js` | Shrinks a raw camera frame into a small picture for the live view (tested in `test/`) |
+| `camview.js` | Paints the live camera picture in the camera panel |
 | `signals.js` | Signal sources: Simulated, Manual, Presage (camera). All emit the same events |
 | `audio.js` | The music engine |
 | `app.js` | Visuals, panel, start/stop logic |
@@ -61,8 +63,15 @@ Every source emits the same events, so music and visuals never care where data c
 | --- | --- |
 | `vitals` | `pulse`, `breathRate`, `trace` (new chest-movement samples) |
 | `status` | `code`, `text` (SDK validation hint) |
-| `tick` | `left` (seconds) |
+| `tick` | `left` (seconds), `fps`, `width`, `height` (what the camera is delivering) |
 | `ended` | `reason`, `seconds` |
+
+- `GET /preview` returns the newest camera picture, shrunk to 320 pixels wide, as raw RGBA
+  (size in the `X-Frame-Width` / `X-Frame-Height` headers), or 204 when there is none. The SDK
+  owns the webcam, so the browser cannot open it as well; the SDK's `videoOutput` event hands
+  each frame to the server, which keeps only the newest one in memory.
+- `/vitals` and `/preview` answer only requests from the Body Band page itself (checked by
+  the `Host` and `Origin` headers), so another website cannot start a camera session.
 
 - One session at a time. A session ends on: page disconnect, the time limit
   (`PRESAGE_MAX_SECONDS`, default 120), an SDK error, or server shutdown.
@@ -71,9 +80,12 @@ Every source emits the same events, so music and visuals never care where data c
 
 ## 6. SDK usage
 
-- Metrics requested: breathing (chest and abdomen movement, breathing rate) and cardio
-  (pulse rate, pulse trace, HRV).
-- Input: `useCamera(CameraSelection.default)` — on Windows, front/back selection is not supported.
+- Metrics requested: chest breathing, breathing rate and pulse rate, which is everything the
+  app reads. Other metrics make the SDK download extra models at session start (the arterial
+  pressure trace needs one), so they are left out until something uses them.
+- Input: `useCamera(CameraSelection.default, { width: 640, height: 480, fps: 30 })`. The SDK
+  refuses to measure below 25 frames a second. Change the mode with `PRESAGE_CAMERA` in `.env`
+  (for example `1280x720@30`). On Windows, front/back selection is not supported.
 - Data arrives as protobuf and is decoded with `decodeMetrics` from `@smartspectra/node-sdk/messages`.
 - Fields used now: latest `cardio.pulseRate`, latest `breathing.rate`, `breathing.upperTrace`.
 
@@ -153,8 +165,11 @@ layout and drawing work, which was not timed directly.
 
 ## 10. Known issues and unknowns
 
-1. **SDK does not load on the dev PC yet:** `smartspectra.dll` needs `VCRUNTIME140_THREADS.dll`,
-   which is missing. Fix: update the Microsoft Visual C++ runtime.
+1. **No real readings yet.** The first camera run (15 Nov, 43 seconds) started the SDK but
+   produced no pulse or breathing. The SDK reported "use a camera mode that provides at least
+   25 frames per second" at its default 1280x720, and a model download for the arterial
+   pressure trace failed (503). Both are addressed above (640x480 at 30, fewer metrics) but
+   not yet re-tested. If the frame rate is still low, the likely cause is dim light.
 2. **Untested with real data:** how often metrics arrive, how many trace samples per packet,
    and whether the chest trace rises or falls on a breath in. The server logs the first five
    packets so this can be tuned after the first camera test.
