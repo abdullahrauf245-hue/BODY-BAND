@@ -1,0 +1,13 @@
+# The hosted copy is the static demo only (Simulated and Manual modes).
+# Keep secrets, the SDK and everything that only runs locally out of the upload.
+.env
+.env.*
+node_modules
+package.json
+package-lock.json
+server.js
+preview.js
+test
+docs
+.git
+.vercel
