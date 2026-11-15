@@ -48,6 +48,7 @@
 
       this.noteIdx = 5;
       this.muted = false;
+      this.breathAt = -1; this.breathVal = -1; // when and what setBreath last scheduled
     }
 
     impulse(seconds) {
@@ -63,6 +64,10 @@
     setBreath(v) {
       if (!this.ctx) return;
       const t = this.ctx.currentTime;
+      // The filter glides by itself (0.12 s), so 20 updates a second sound the same as 60
+      // and queue a third of the automation events. Unchanged values queue nothing.
+      if (t - this.breathAt < 0.05 || v === this.breathVal) return;
+      this.breathAt = t; this.breathVal = v;
       this.cutoff = 220 + v * 2400; // Hz, shown on the BREATH PAD knob
       this.padFilter.frequency.setTargetAtTime(this.cutoff, t, 0.12);
       this.padGain.gain.setTargetAtTime(0.06 + v * 0.11, t, 0.12);
