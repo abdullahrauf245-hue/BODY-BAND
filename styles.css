@@ -145,7 +145,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
   background: var(--card); border: 1px solid var(--hairline); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   font-family: var(--mono);
 }
-.mod-cam { width: 256px; gap: 10px; padding: 12px; }
+.mod-cam { width: clamp(256px, 26vw, 380px); gap: 10px; padding: 12px; }
 .mod-head {
   display: flex; align-items: center; justify-content: space-between;
   border-bottom: 1px solid var(--hairline); padding-bottom: 8px;
@@ -201,7 +201,7 @@ button.key:hover:not(:disabled) { background: var(--muted); }
 
 /* camera module */
 .viewfinder {
-  position: relative; height: 144px; overflow: hidden; border-radius: 1px;
+  position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 1px;
   display: grid; place-items: center;
   background: #0E1015; border: 1px solid var(--hairline); color: rgba(255, 255, 255, 0.22);
   background-image:
@@ -233,6 +233,48 @@ button.key:hover:not(:disabled) { background: var(--muted); }
 .rows { display: grid; gap: 3px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 8px; }
 .rows div { display: flex; justify-content: space-between; }
 .rows span { color: var(--subtle); }
+
+/* camera check dialog */
+.cc {
+  width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0;
+  border: 1px solid var(--hairline); border-radius: 2px;
+  background: var(--card); color: var(--ink); font-family: var(--mono);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.cc::backdrop { background: rgba(245, 245, 243, 0.7); backdrop-filter: blur(3px); }
+.cc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--hairline);
+}
+.cc-body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; padding: 14px; }
+.cc-view {
+  position: relative; aspect-ratio: 4 / 3; overflow: hidden;
+  background: #0E1015; border: 1px solid var(--hairline);
+}
+.cc-view video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.cc-guide {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  fill: none; stroke: var(--cyan); stroke-width: 0.8; stroke-dasharray: 3 2; opacity: 0.85;
+}
+.cc-msg {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; padding: 5px 6px; text-align: center;
+  font-size: 9px; font-weight: 600; letter-spacing: 0.1em; color: #fff; background: rgba(14, 16, 21, 0.78);
+}
+.cc-msg.ok { color: #34D399; }
+.cc-msg.bad { color: #FF8BA0; }
+.cc-side h2 { margin: 0 0 8px; font: 600 16px/1.2 var(--display); letter-spacing: -0.01em; }
+.cc-side ul { margin: 0 0 10px; padding-left: 16px; font: 400 11px/1.5 var(--sans); color: var(--charcoal); user-select: text; }
+.cc-side li { margin-bottom: 6px; }
+.cc-side .rows { font-size: 9px; }
+.cc-tip { margin: 8px 0 0; font: 400 10px/1.4 var(--sans); color: var(--dim); }
+.cc-foot {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 10px 14px; border-top: 1px solid var(--hairline); background: var(--base);
+}
+.cc-foot .key { padding: 9px 14px; }
+#ccFps.ok, #ccLight.ok { color: var(--led); }
+#ccFps.bad, #ccLight.bad, #camFeed.bad { color: var(--warn); }
+@media (max-width: 640px) { .cc-body { grid-template-columns: 1fr; } }
 
 /* ---- dial ---- */
 .dial-wrap { flex: 1; min-width: 0; display: grid; place-items: center; }
@@ -295,7 +337,7 @@ button.key:hover:not(:disabled) { background: var(--muted); }
 #subNotice { color: var(--ink); font-weight: 600; }
 
 /* ---- smaller windows ---- */
-@media (max-width: 1320px) { .mod-r { display: none; } }
+@media (max-width: 1440px) { .mod-r { display: none; } } /* make room for the bigger camera */
 @media (max-width: 1080px) { .mod-cam { display: none; } .stage { padding: 16px 24px; } }
 @media (max-width: 820px) {
   .mod-l, .wide { display: none; }
