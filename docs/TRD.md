@@ -106,6 +106,31 @@ readout shows a real value; nothing on screen is placeholder data.
 Breathing guides (4-7-8, box, coherence): the needle on the dial shows where the guide wants
 the breath to be, and the arc shows where it is. The user tries to keep the arc tip on the needle.
 
+### Performance pass (15 Nov)
+
+The signal side and the drawing side run on separate loops:
+
+| Loop | Runs | Does |
+| --- | --- | --- |
+| Signal | A steady timer inside the source, about 60 times a second | Updates the numbers, the breath trace and the music |
+| Draw | Only when the browser paints | Draws the latest numbers, skipping every readout whose value has not changed |
+
+Why: beats used to be produced by the drawing loop, so the rhythm slowed whenever drawing did.
+In a throttled browser tab drawing 1 to 2 frames a second, the signal loop was measured at
+58 to 61 ticks a second.
+
+Measured in Chrome with both versions driven at the same draw rate (about 40 to 45 draws a second):
+
+| | Before | After |
+| --- | --- | --- |
+| Page updates per second, simulated breathing (dial moving) | 908 | 313 |
+| Page updates per second, at rest (manual mode, no input) | 849 | 53 |
+| Script time per second, simulated breathing | 10.6 ms | 9.6 ms |
+| Script time per second, at rest | 9.5 ms | 6.7 ms |
+
+Script time was already about 1% of one processor core, so the gain is in the browser's own
+layout and drawing work, which was not timed directly.
+
 ## 8. Non-functional requirements
 
 | Area | Requirement |
