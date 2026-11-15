@@ -264,6 +264,8 @@
     if (source || starting) return;
     starting = true; // a second click while the audio engine is starting must not stop a half-built session
     try {
+      // Camera sessions use SDK minutes: ask first, and let the person check light and framing for free.
+      if (selected === 'presage' && !(await CamCheck.open())) return;
       resetState();
       if (document.activeElement) document.activeElement.blur();
       source = selected === 'manual' ? new Signals.ManualSource($('stage'))
@@ -286,7 +288,10 @@
           setText('subNotice', e.text || 'RUNNING');
         } else if (e.type === 'time') {
           st.left = e.left;
-          if (e.width) setText('camFeed', `${e.width}×${e.height} · ${e.fps} FPS`);
+          if (e.width) {
+            setText('camFeed', `${e.width}×${e.height} · ${e.fps} FPS`);
+            $('camFeed').classList.toggle('bad', e.fps < 25); // the SDK won't measure below 25
+          }
         } else if (e.type === 'ended') end(e.reason);
       });
       source.start();
@@ -312,6 +317,7 @@
     setText('guideTag', pacer === 'free' ? 'FREE' : 'GUIDE SET');
     setText('camLeft', '--:--');
     setText('camFeed', '--');
+    $('camFeed').classList.remove('bad');
     setText('phaseLabel', 'PHASE TIME');
     setText('phaseTime', '-.-s');
     restDial();
