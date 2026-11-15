@@ -34,6 +34,18 @@ Notes always come from one scale (A minor pentatonic), so it sounds pleasant wha
 There are also three breathing guides (4-7-8, Box, Coherence). The needle on the dial shows
 where the guide wants your breath to be; you try to keep the arc on it.
 
+## Quick start for a tester (Windows, no terminal)
+
+Camera mode reads a webcam on the computer that runs the app, so to try it with your own
+webcam you run Body Band on your own computer. It takes a few minutes the first time.
+
+1. On the [GitHub page](https://github.com/abdullahrauf245-hue/BODY-BAND), press **Code**, then **Download ZIP**, and unzip it.
+2. Double-click **`BodyBand.bat`**.
+3. The first time it may ask you to install two free things from Microsoft and Node.js (it opens the download page and tells you); do that, then double-click `BodyBand.bat` again. It then installs the app (about 400 MB, a few minutes) and asks for a **Presage API key**: get your own free one at [physiology.presagetech.com](https://physiology.presagetech.com/). The key is saved only on your computer.
+4. The browser opens Body Band. Pick **CAMERA** → **START SESSION**. The camera check shows your webcam first and uses no key minutes; measuring starts only when you press START MEASURING, and stops by itself after 2 minutes.
+
+Not on Windows: the SDK also supports Apple Silicon Macs and Linux. Install [Node.js](https://nodejs.org/), run `npm install`, copy `.env.example` to `.env` and put your key in it, then run `npm start` (details below).
+
 ## Run it
 
 Requirements: Windows 10/11 (64-bit), [Node.js](https://nodejs.org/) 20 or newer, and for
