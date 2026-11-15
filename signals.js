@@ -20,19 +20,19 @@
       this.running = true;
       this.last = performance.now();
       this.beatAcc = 0;
-      const tick = (now) => {
-        if (!this.running) return;
-        const dt = Math.min((now - this.last) / 1000, 0.1);
+      // A steady timer, not requestAnimationFrame: the music must keep time even when
+      // the browser is drawing slowly or the window is in the background.
+      this.timer = setInterval(() => {
+        const now = performance.now();
+        const dt = Math.min((now - this.last) / 1000, 1);
         this.last = now;
         this.update(dt, now / 1000);
         this.beatAcc += dt * this.pulse / 60;
-        if (this.beatAcc >= 1) { this.beatAcc -= 1; this.emit({ type: 'beat' }); }
+        if (this.beatAcc >= 1) { this.beatAcc %= 1; this.emit({ type: 'beat' }); }
         this.emit({ type: 'frame', pulse: this.pulse, breathRate: this.breathRate, breath: this.breath });
-        this.raf = requestAnimationFrame(tick);
-      };
-      this.raf = requestAnimationFrame(tick);
+      }, 1000 / 60);
     }
-    stop() { this.running = false; cancelAnimationFrame(this.raf); }
+    stop() { this.running = false; clearInterval(this.timer); }
   }
 
   /** A believable fake body: slow drifting pulse, smooth breathing. */
@@ -126,9 +126,10 @@
         if (d.breathRate) this.breathRate = d.breathRate;
         if (d.trace && d.trace.length) {
           // scale the raw chest trace to 0..1 using the last few breaths
-          this.window.push(...d.trace);
-          if (this.window.length > 600) this.window.splice(0, this.window.length - 600);
-          const min = Math.min(...this.window), max = Math.max(...this.window);
+          // (keeps the newest 600 samples however many arrive at once; one pass for min/max)
+          this.window = this.window.concat(d.trace).slice(-600);
+          let min = Infinity, max = -Infinity;
+          for (const v of this.window) { if (v < min) min = v; if (v > max) max = v; }
           if (max - min > 1e-6) this.target = (d.trace[d.trace.length - 1] - min) / (max - min);
         }
       });
