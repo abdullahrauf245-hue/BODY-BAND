@@ -183,10 +183,20 @@ function sendPreview(res) {
   res.end(img.data);
 }
 
+// The camera endpoints answer this page only: not another website open in the same
+// browser (it would send its own Origin), and not another hostname pointed at this PC.
+function fromThisPage(req) {
+  const hosts = [`localhost:${PORT}`, `127.0.0.1:${PORT}`];
+  const { host, origin } = req.headers;
+  return hosts.includes(host) && (!origin || hosts.some((h) => origin === `http://${h}`));
+}
+
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
-  if (req.method === 'GET' && url === '/vitals') return void startSession(req, res);
-  if (req.method === 'GET' && url === '/preview') return sendPreview(res);
+  if (url === '/vitals' || url === '/preview') {
+    if (req.method !== 'GET' || !fromThisPage(req)) { res.writeHead(403); return res.end('Forbidden'); }
+    return url === '/vitals' ? void startSession(req, res) : sendPreview(res);
+  }
   const entry = req.method === 'GET' && STATIC[url];
   if (!entry) { res.writeHead(404); return res.end('Not found'); }
   fs.readFile(path.join(__dirname, entry[0]), (err, data) => {
