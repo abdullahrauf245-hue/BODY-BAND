@@ -284,10 +284,13 @@
         else if (e.type === 'status') {
           setText('camHint', e.text || 'READING VITALS');
           setText('subNotice', e.text || 'RUNNING');
-        } else if (e.type === 'time') st.left = e.left;
-        else if (e.type === 'ended') end(e.reason);
+        } else if (e.type === 'time') {
+          st.left = e.left;
+          if (e.width) setText('camFeed', `${e.width}×${e.height} · ${e.fps} FPS`);
+        } else if (e.type === 'ended') end(e.reason);
       });
       source.start();
+      if (selected === 'presage') CamView.start($('camView'), $('viewfinder'));
       rafId = requestAnimationFrame(render);
     } finally {
       starting = false;
@@ -298,6 +301,7 @@
     if (!source) return;
     if (unsub) unsub();
     source.stop();
+    CamView.stop();
     cancelAnimationFrame(rafId);
     const b = band;
     source = band = unsub = null;
@@ -307,6 +311,7 @@
     setText('phaseTag', 'STANDBY');
     setText('guideTag', pacer === 'free' ? 'FREE' : 'GUIDE SET');
     setText('camLeft', '--:--');
+    setText('camFeed', '--');
     setText('phaseLabel', 'PHASE TIME');
     setText('phaseTime', '-.-s');
     restDial();

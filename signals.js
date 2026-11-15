@@ -108,8 +108,9 @@
 
   /**
    * Real vitals from the SmartSpectra SDK, streamed by server.js (npm start).
-   * Extra events: { type: 'status', text } camera hints, { type: 'time', left }
-   * seconds remaining, { type: 'ended', reason } when the session is over.
+   * Extra events: { type: 'status', text } camera hints, { type: 'time', left, fps,
+   * width, height } seconds remaining and what the camera is delivering,
+   * { type: 'ended', reason } when the session is over.
    */
   class PresageSource extends SignalSource {
     constructor() {
@@ -134,7 +135,7 @@
         }
       });
       es.addEventListener('status', (e) => this.emit({ type: 'status', text: JSON.parse(e.data).text }));
-      es.addEventListener('tick', (e) => this.emit({ type: 'time', left: JSON.parse(e.data).left }));
+      es.addEventListener('tick', (e) => this.emit({ type: 'time', ...JSON.parse(e.data) }));
       es.addEventListener('ended', (e) => {
         es.close();
         this.emit({ type: 'ended', reason: JSON.parse(e.data).reason });
