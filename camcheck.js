@@ -13,6 +13,9 @@
  */
 (function () {
   const MIN_FPS = 25;
+  // Exposure (in 100-microsecond units, as Chrome reports it) at which a camera can no longer
+  // hold 30 frames a second: 90% of one frame, 0.9 x 333.
+  const STRAINED_EXPOSURE = 300;
   const DARK = 60;           // average brightness (0..255) below which the picture is dark
   const RELEASE_MS = 400;    // give the camera driver time to let go before the SDK opens it
   const $ = (id) => document.getElementById(id);
@@ -64,15 +67,26 @@
         for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
         light = sum / (d.length / 4);
       }
+      // The picture can look bright while the camera is struggling: in dim light it keeps its
+      // shutter open longer to compensate, and once that is about as long as one frame it
+      // cannot deliver 30 a second any more. Cameras that report their exposure tell us.
+      const exposure = stream && stream.getVideoTracks()[0].getSettings().exposureTime; // 100 µs units
+      const strained = typeof exposure === 'number' && exposure >= STRAINED_EXPOSURE;
       if (seconds < 2) return; // the first second includes the camera starting up
 
       $('ccFps').textContent = `${fps} FPS`;
       $('ccFps').className = fps >= MIN_FPS ? 'ok' : 'bad';
-      $('ccLight').textContent = light === null ? '--' : light < DARK ? 'DARK' : 'OK';
-      $('ccLight').className = light === null ? '' : light < DARK ? 'bad' : 'ok';
+      const lightState = strained ? 'LOW' : light === null ? null : light < DARK ? 'DARK' : 'OK';
+      $('ccLight').textContent = lightState || '--';
+      $('ccLight').className = lightState === null ? '' : lightState === 'OK' ? 'ok' : 'bad';
       if (fps < MIN_FPS) {
-        say(`ONLY ${fps} FRAMES A SECOND — ADD LIGHT FACING YOU`, 'bad');
+        say(strained
+          ? `ONLY ${fps} FRAMES A SECOND — THE CAMERA IS STRAINING IN THIS LIGHT. ADD LIGHT FACING YOU`
+          : `ONLY ${fps} FRAMES A SECOND — ADD LIGHT FACING YOU`, 'bad');
         ready(false);
+      } else if (strained) {
+        say('FRAME RATE OK FOR NOW, BUT THE CAMERA IS AT ITS LIMIT — MORE LIGHT KEEPS IT STEADY', 'bad');
+        ready(true);
       } else if (light !== null && light < DARK) {
         say('FRAME RATE OK, BUT DARK — MORE LIGHT HELPS', 'bad');
         ready(true);
