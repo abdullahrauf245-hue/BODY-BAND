@@ -87,8 +87,8 @@
     $('camSourceBtn').title = 'Real pulse and breathing from the camera (uses free minutes)';
     $('useCamBtn').disabled = false;
   } else {
-    setText('camHint', 'CAMERA MODE RUNS ON YOUR PC — SEE README');
-    $('camSourceBtn').title = 'Camera mode runs on your own PC with the SmartSpectra SDK: see the README';
+    setText('camHint', 'CAMERA NEEDS THE LOCAL APP. TRY SIMULATED OR MANUAL HERE');
+    $('camSourceBtn').title = 'Camera mode needs the local app (the SmartSpectra SDK runs on your own PC). Simulated and Manual work here. See the README to run it.';
   }
 
   // ---------- helpers ----------
