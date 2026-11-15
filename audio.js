@@ -6,6 +6,7 @@
  */
 (function () {
   const SCALE = [0, 3, 5, 7, 10]; // minor pentatonic, always sounds nice
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
   class BodyBand {
     async start() {
@@ -62,7 +63,8 @@
     setBreath(v) {
       if (!this.ctx) return;
       const t = this.ctx.currentTime;
-      this.padFilter.frequency.setTargetAtTime(220 + v * 2400, t, 0.12);
+      this.cutoff = 220 + v * 2400; // Hz, shown on the BREATH PAD knob
+      this.padFilter.frequency.setTargetAtTime(this.cutoff, t, 0.12);
       this.padGain.gain.setTargetAtTime(0.06 + v * 0.11, t, 0.12);
     }
 
@@ -86,6 +88,8 @@
       const lift = pulse > 85 ? 12 : pulse < 62 ? -12 : 0;
       const semis = SCALE[this.noteIdx % 5] + 12 * Math.floor(this.noteIdx / 5) + 24 + lift;
       const f = this.root * 2 ** (semis / 12);
+      const midi = 45 + semis; // root A2 is MIDI note 45
+      this.lastNote = { name: NOTE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1), hz: f, level: this.noteIdx / 9 };
 
       const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
       o.type = 'triangle';
