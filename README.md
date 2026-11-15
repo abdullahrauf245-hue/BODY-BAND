@@ -62,7 +62,11 @@ Simulated and Manual modes also work by just double-clicking `index.html`, with 
 ### Tips for camera mode
 
 - Face the camera in good light, with your face and chest in frame, and sit fairly still.
+- The camera panel shows your live picture (mirrored), so you can check framing and light.
 - Hints such as "face not centered" appear in the camera panel.
+- The SDK needs at least 25 camera frames a second. The panel's CAMERA FEED row shows what
+  your webcam is delivering; if it is lower, add light. The camera mode defaults to 640x480
+  at 30 and can be changed with `PRESAGE_CAMERA=1280x720@30` in `.env`.
 - Each camera session **stops by itself after 2 minutes** (and when you press Stop or close
   the tab), so SDK minutes are never used by accident. Change the limit with
   `PRESAGE_MAX_SECONDS` in `.env`.
@@ -70,9 +74,12 @@ Simulated and Manual modes also work by just double-clicking `index.html`, with 
 ## Privacy
 
 - The API key stays in `.env` on your PC. It is ignored by git and never sent to the browser.
-- Body Band does not record, store or upload video or vitals. The SmartSpectra SDK does its
-  own processing and talks to Presage's service; see Presage's documentation for details.
-- The server only listens on your own PC (`127.0.0.1`).
+- Body Band does not record, store or upload video or vitals. The live picture in the camera
+  panel goes from the SDK to your own browser on the same PC and is held in memory only while
+  a session runs. The SmartSpectra SDK does its own processing and talks to Presage's
+  service; see Presage's documentation for details.
+- The server only listens on your own PC (`127.0.0.1`), and only the Body Band page itself
+  can start the camera or read its picture.
 
 Body Band is an art and wellbeing project, **not a medical device**. Do not use its readings
 for any health decision.
@@ -88,6 +95,8 @@ Everything Body Band adds is plain rules: this signal moves that sound.
 | File | Job |
 | --- | --- |
 | `server.js` | Serves the page; runs the SmartSpectra camera session and streams it to the page |
+| `preview.js`, `camview.js` | The live camera picture: shrink it on the server, paint it on the page |
+| `test/` | Tests for the picture conversion (`npm test`) |
 | `signals.js` | The three signal sources, all emitting the same events |
 | `audio.js` | The music engine (Web Audio, no libraries) |
 | `app.js` | The console: dial, readouts, breathing guides, start/stop |
