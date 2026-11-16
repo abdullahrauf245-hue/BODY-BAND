@@ -8,8 +8,9 @@
   --ink: #111111;
   --charcoal: #222222;
   --dim: #555552;
-  --subtle: #888884;
-  --cyan: #00A3FF;
+  --subtle: #6A6A66;      /* small labels: 4.5:1 or better on every panel colour */
+  --cyan: #00A3FF;        /* lines, arcs and lights */
+  --cyan-text: #0070C4;   /* the same blue, darkened so small text reads on white */
   --led: #10B981;
   --warn: #E11D48;
   --sans: Inter, -apple-system, "Segoe UI", system-ui, sans-serif;
@@ -45,7 +46,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
 .dim { color: var(--subtle); }
 .strong { color: var(--charcoal); font-weight: 500; }
-.accent { color: var(--cyan); font-weight: 700; letter-spacing: 0.08em; }
+.accent { color: var(--cyan-text); font-weight: 700; letter-spacing: 0.08em; }
 .sep { width: 1px; height: 14px; background: var(--hairline); flex: none; }
 
 /* ---- small parts ---- */
