@@ -36,6 +36,7 @@ runtime (a recent version that includes `VCRUNTIME140_THREADS.dll`).
 | `preview.js` | Shrinks a raw camera frame into a small picture for the live view (tested in `test/`) |
 | `camview.js` | Paints the live camera picture in the camera panel |
 | `signals.js` | Signal sources: Simulated, Manual, Presage (camera). All emit the same events |
+| `vitals.js` | Signal logic with no page, audio or SDK in it, so it is unit tested: breath scaling, pulse filtering, breath counting, guides, sync score |
 | `audio.js` | The music engine |
 | `app.js` | Visuals, panel, start/stop logic |
 | `index.html`, `styles.css` | Page and look |
@@ -98,9 +99,25 @@ Every source emits the same events, so music and visuals never care where data c
 | Pulse level | Octave and brightness of the notes | — |
 | HRV (planned) | Harmony and mood | Colour temperature |
 
-Breath position from the camera: the raw chest trace is scaled to 0..1 using the lowest and
-highest values of the last 600 samples, then smoothed. Heartbeats are currently generated
-from the pulse rate; using the real pulse trace for exact beat timing is a planned upgrade.
+Making the camera readings dependable (`vitals.js`, 16 unit tests):
+
+| Problem | What the code does |
+| --- | --- |
+| A cough or a shift in the chair is far bigger than a breath | The chest trace is scaled to 0..1 between the 4th and 96th percentile of the last 600 samples, not the minimum and maximum, so one spike does not flatten every breath for 20 seconds |
+| An impossible or odd pulse reading | Readings outside 35 to 200 are ignored, each reading is the median of the last five, and the tempo glides over about a second |
+| A wobble halfway through a breath | A breath is counted only when an inhale starts after the breath has fallen at least 0.2 from its peak |
+| The SDK needs time before its first pulse | The page says "finding your pulse" until one arrives, and plays no beats before then |
+| The SDK stops with an error | Its error code is shown in plain words (API key refused, minutes used up, no internet, camera busy, frame rate too low) |
+
+The first successful camera session (16 Nov) showed 1 to 2 chest samples per packet and the
+camera holding 29 to 30 frames a second. Heartbeats are generated from the pulse rate; the
+SDK's beat-by-beat pulse waveform needs a model download that failed on 15 Nov, so exact
+beat timing is not used. `BODYBAND_DEBUG=1` prints a summary of the raw readings every 10
+seconds for tuning; nothing is written to disk.
+
+The SYNC score compares the breath with the guide over about the last 8 seconds. A camera
+reading always arrives a little late, so the breath is compared with where the guide was 0,
+0.5, 1 and 1.5 seconds ago and the best match counts.
 
 ### Console UI (redesign, 15 Nov)
 

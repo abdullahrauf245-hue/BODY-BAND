@@ -19,7 +19,8 @@ and the music is yours.
 It looks like a piece of studio hardware: a telemetry strip with pulse and breathing rate, a
 dial whose blue arc fills as you breathe in, and two "voices" showing what the music is doing.
 Three breathing guides (4-7-8, box breathing, coherence breathing) put a needle on the dial
-showing where your breath should be, so you can try to keep the arc on it.
+showing where your breath should be, and a SYNC score shows how closely your real breathing
+follows it.
 
 The notes always come from one scale (A minor pentatonic), so it sounds pleasant whatever
 your body does.
@@ -59,8 +60,12 @@ SmartSpectra SDK (`MetricType.PULSE_RATE`, `BREATHING_RATE`, `CHEST_BREATHING`).
   `videoOutput` and `error` events.
 - Each metrics packet is decoded with `decodeMetrics`, and the newest pulse rate, breathing
   rate and new chest-trace samples are streamed to the page over Server-Sent Events.
-- The page scales the chest trace to 0..1 over the last few breaths and smooths it, then a
-  Web Audio engine (no libraries) turns it into sound.
+- The page scales the chest trace to 0..1 over the last few breaths, then a Web Audio engine
+  (no libraries) turns it into sound. A cough or a shift in the chair is far bigger than a
+  breath, so the scale uses the 4th to 96th percentile rather than the extremes, impossible
+  pulse readings are ignored, and the tempo glides instead of jumping.
+- If the SDK stops (API key refused, minutes used up, no internet, frame rate too low), the
+  page says so in plain words.
 - The SDK's readiness hints ("place more of the chest in view", frame rate too low) appear in
   the camera panel, and its `videoOutput` frames are shown, mirrored, as a live preview.
 - The rest of the app never knows where the numbers come from: a simulated body and a

@@ -32,7 +32,8 @@ Notes always come from one scale (A minor pentatonic), so it sounds pleasant wha
 | **Camera** | Your real pulse and breathing from the webcam | SmartSpectra API key |
 
 There are also three breathing guides (4-7-8, Box, Coherence). The needle on the dial shows
-where the guide wants your breath to be; you try to keep the arc on it.
+where the guide wants your breath to be; you try to keep the arc on it, and a SYNC score
+shows how closely your breathing follows.
 
 ## Quick start for a tester (Windows, no terminal)
 
@@ -117,8 +118,9 @@ Everything Body Band adds is plain rules: this signal moves that sound.
 | --- | --- |
 | `server.js` | Serves the page; runs the SmartSpectra camera session and streams it to the page |
 | `preview.js`, `camview.js` | The live camera picture: shrink it on the server, paint it on the page |
-| `test/` | Tests for the picture conversion (`npm test`) |
+| `test/` | Tests for the signal logic and the picture conversion (`npm test`) |
 | `signals.js` | The three signal sources, all emitting the same events |
+| `vitals.js` | The signal logic: breath scaling, pulse filtering, breath counting, guides and the sync score |
 | `audio.js` | The music engine (Web Audio, no libraries) |
 | `app.js` | The console: dial, readouts, breathing guides, start/stop |
 | `index.html`, `styles.css` | Page and look |
