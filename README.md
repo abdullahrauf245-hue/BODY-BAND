@@ -87,6 +87,11 @@ Simulated and Manual modes also work by just double-clicking `index.html`, with 
 - The SDK needs at least 25 camera frames a second. The panel's CAMERA FEED row shows what
   your webcam is delivering; if it is lower, add light. The camera mode defaults to 640x480
   at 30 and can be changed with `PRESAGE_CAMERA=1280x720@30` in `.env`.
+- **Using a phone as the webcam** (often steadier in dim light): install a phone-webcam app such as
+  Iriun Webcam or DroidCam on the phone and its PC program, connect by USB or the same Wi-Fi, and
+  check the phone shows up as a camera. Run `npm run cameras` to see its name, then add part of
+  it to `.env`, for example `PRESAGE_CAMERA_NAME=Iriun`, and restart. The camera check then shows
+  the phone, and a session refuses to start (instead of using the laptop webcam) if it isn't connected.
 - Each camera session **stops by itself after 2 minutes** (and when you press Stop or close
   the tab), so SDK minutes are never used by accident. Change the limit with
   `PRESAGE_MAX_SECONDS` in `.env`.
