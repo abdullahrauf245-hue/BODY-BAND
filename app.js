@@ -35,8 +35,11 @@
 
   function resetState() {
     Object.assign(st, {
-      breath: 0, pulse: 0, breathRate: 0, vel: 0, lastT: 0,
-      phase: 'HOLD', cand: 'HOLD', candT: 0, phaseStart: 0, cycles: 0,
+      breath: 0, pulse: 0, breathRate: 0, lastT: 0,
+      phase: 'HOLD', phaseStart: 0, cycles: 0,
+      detector: new Vitals.PhaseDetector(), // which way the breath is going, and the breath count
+      sync: new Vitals.SyncMeter(), syncScore: null, // how closely the breath follows a guide
+      hint: '',                             // the camera's latest complaint, '' when it is happy
       beatGlow: 0, lastBeat: 0, intervals: [], hist: [], histDirty: false, waveAcc: 0,
       startT: 0, lastDraw: 0, nextText: 0, left: null,
     });
@@ -94,24 +97,6 @@
   // ---------- helpers ----------
   const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-  /** Where the breathing guide is at time t: what to do, and how full the lungs should be (0..1). */
-  function guideAt(steps, t) {
-    const total = steps.reduce((a, s) => a + s[1], 0);
-    let x = t % total, level = 0;
-    for (const [label, secs] of steps) {
-      if (x < secs) {
-        const p = x / secs;
-        if (label === 'INHALE') level = p;
-        else if (label === 'EXHALE') level = 1 - p;
-        return { label, level, left: secs - x };
-      }
-      x -= secs;
-      if (label === 'INHALE') level = 1;
-      else if (label === 'EXHALE') level = 0;
-    }
-    return { label: steps[0][0], level: 0, left: 0 };
-  }
-
   function setPressed(selector, attr, value) {
     document.querySelectorAll(selector).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === value)));
   }
@@ -137,17 +122,19 @@
     const dt = Math.max(now - st.lastT, 0.001);
     st.lastT = now;
 
-    // which way is the breath going? (smoothed over ~0.1 s; a change must hold 0.2 s to count)
-    st.vel += ((e.breath - st.breath) / dt - st.vel) * (1 - Math.exp(-dt / 0.1));
-    const cand = st.vel > 0.04 ? 'INHALING' : st.vel < -0.04 ? 'EXHALING' : 'HOLD';
-    if (cand !== st.cand) { st.cand = cand; st.candT = now; }
-    else if (cand !== st.phase && now - st.candT > 0.2) {
-      st.phase = cand; st.phaseStart = now;
-      if (cand === 'INHALING') st.cycles++;
-    }
+    st.phase = st.detector.update(e.breath, now);
+    st.phaseStart = st.detector.phaseStart;
+    st.cycles = st.detector.cycles;
 
     st.breath = e.breath; st.pulse = e.pulse; st.breathRate = e.breathRate;
     band.setBreath(e.breath);
+
+    const steps = PACERS[pacer];
+    if (steps) {
+      const t = now - st.startT;
+      const levels = Vitals.SyncMeter.DELAYS.map((d) => Vitals.guideAt(steps, Math.max(0, t - d)).level);
+      st.syncScore = st.sync.update(levels, e.breath, dt);
+    }
 
     // sample the breath trace at a fixed rate, whatever the tick or drawing rate
     st.waveAcc += dt;
@@ -208,7 +195,7 @@
 
     if (guide) {
       setText('phase', guide.label);
-      setText('guideTag', `YOU: ${st.phase}`);
+      setText('guideTag', st.syncScore === null ? 'SYNC --' : `SYNC ${st.syncScore}%`);
       setText('phaseLabel', 'NEXT STEP IN');
       setText('phaseTime', `${guide.left.toFixed(1)}s`);
     } else {
@@ -227,6 +214,14 @@
     }
     setText('elapsed', mmss(now - st.startT));
     if (st.left !== null) setText('camLeft', mmss(st.left));
+    if (selected === 'presage') showCameraMessage(); // "finding your pulse" turns into "reading"
+  }
+
+  /** What the camera panel and the status line say during a camera session. */
+  function showCameraMessage() {
+    // The SDK's own hint wins; otherwise say whether its first pulse reading has arrived yet.
+    setText('camHint', st.hint || (st.pulse ? 'READING VITALS' : 'FINDING YOUR PULSE. KEEP STILL'));
+    setText('subNotice', st.hint || (st.pulse ? 'RUNNING' : 'FINDING YOUR PULSE. KEEP STILL'));
   }
 
   function render() {
@@ -236,7 +231,7 @@
     st.lastDraw = now;
 
     const steps = PACERS[pacer];
-    const guide = steps ? guideAt(steps, now - st.startT) : null;
+    const guide = steps ? Vitals.guideAt(steps, now - st.startT) : null;
     drawDial(guide);
     if (now >= st.nextText) { st.nextText = now + TEXT_PERIOD; drawText(now, guide); }
     rafId = requestAnimationFrame(render);
@@ -282,14 +277,15 @@
       setText('sampleRate', `${(band.ctx.sampleRate / 1000).toFixed(1)} kHz`);
 
       st.startT = st.lastT = st.phaseStart = st.lastDraw = performance.now() / 1000;
+      st.detector.reset(st.startT);
       showLive(true);
 
       unsub = source.on((e) => {
         if (e.type === 'frame') onSignal(e);
         else if (e.type === 'beat') onBeat();
         else if (e.type === 'status') {
-          setText('camHint', e.text || 'READING VITALS');
-          setText('subNotice', e.text || 'RUNNING');
+          st.hint = e.text || '';
+          showCameraMessage();
         } else if (e.type === 'time') {
           st.left = e.left;
           if (e.width) {
@@ -341,6 +337,7 @@
   document.querySelectorAll('[data-source]').forEach((b) => b.addEventListener('click', () => selectSource(b.dataset.source)));
   document.querySelectorAll('[data-pacer]').forEach((b) => b.addEventListener('click', () => {
     pacer = b.dataset.pacer;
+    st.sync.reset(); st.syncScore = null; // a new guide starts its score from scratch
     setPressed('[data-pacer]', 'pacer', pacer);
     if (!source) setText('guideTag', pacer === 'free' ? 'FREE' : 'GUIDE SET');
   }));
