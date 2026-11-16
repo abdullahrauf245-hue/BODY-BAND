@@ -327,7 +327,6 @@ button.key:hover:not(:disabled) { background: var(--muted); }
   font: 600 11px/1 var(--mono); letter-spacing: 0.08em;
 }
 .cta:hover { background: var(--charcoal); }
-.cta:active { transform: translateY(0.5px); }
 .sub-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   background: var(--base); border-top: 1px solid var(--hairline); padding: 5px 16px;
@@ -351,6 +350,30 @@ button.key:hover:not(:disabled) { background: var(--muted); }
   .seg { overflow-x: auto; max-width: 100%; }
 }
 
+
+/* ---- entrance and button feel ---- */
+
+/* The console arrives once on load: readings first, then the dial and panels, then the controls.
+   Only opacity and transform move, nothing pushes a neighbour. */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+.bar.top, .strip, .stage > *, .deck { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+.strip { animation-delay: 0.08s; }
+.stage > * { animation-delay: 0.18s; }
+.stage > .dial-wrap { animation-delay: 0.26s; }
+.deck { animation-delay: 0.34s; }
+
+/* Buttons: step up 1px on hover (mouse only), sink 1px and shrink a touch when pressed. */
+.cta, button.key, .icon-btn {
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .cta:hover, button.key:hover:not(:disabled), .icon-btn:hover { transform: translateY(-1px); }
+}
+.cta:active, button.key:active:not(:disabled), .icon-btn:active {
+  transform: translateY(1px) scale(0.985);
+  transition-duration: 0.09s;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
+  * { transition: none !important; animation: none !important; }
 }
