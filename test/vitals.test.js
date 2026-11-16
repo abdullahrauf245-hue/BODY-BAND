@@ -125,19 +125,36 @@ test('guideAt handles uneven steps (4-7-8)', () => {
 
 // ---------- SyncMeter ----------
 
+const COHERENCE = [['INHALE', 5.5], ['EXHALE', 5.5]];
+const guideLevels = (t) => SyncMeter.DELAYS.map((d) => guideAt(COHERENCE, Math.max(0, t - d)).level);
+
+/** Run a SyncMeter for `seconds` against the coherence guide, with the breath given by fn(t). */
+function runSync(fn, seconds) {
+  const m = new SyncMeter();
+  let score = null;
+  for (let i = 1; i <= seconds * 60; i++) score = m.update(guideLevels(i / 60), fn(i / 60), 1 / 60);
+  return { m, score };
+}
+
 test('SyncMeter: nothing at first, 100 when the breath matches the guide', () => {
   const m = new SyncMeter();
-  assert.equal(m.update(0.5, 0.5, 1), null, 'still warming up');
-  let score = null;
-  for (let i = 0; i < 600; i++) score = m.update(0.3, 0.3, 1 / 60);
-  assert.equal(score, 100);
+  assert.equal(m.update(guideLevels(1), guideAt(COHERENCE, 1).level, 1), null, 'still warming up');
+  assert.equal(runSync((t) => guideAt(COHERENCE, t).level, 30).score, 100);
+});
+
+test('SyncMeter: following the guide a second late (sensor delay) still counts as in sync', () => {
+  const { score } = runSync((t) => guideAt(COHERENCE, Math.max(0, t - 1)).level, 40);
+  assert.ok(score >= 95, `one second late scored ${score}`);
 });
 
 test('SyncMeter: breathing opposite to the guide scores low, and reset starts over', () => {
-  const m = new SyncMeter();
-  let score = null;
-  for (let i = 1; i <= 30 * 60; i++) { const b = unitBreath(6)(i / 60); score = m.update(b, 1 - b, 1 / 60); }
-  assert.ok(score < 25, `opposite breathing scored ${score}`);
+  const { m, score } = runSync((t) => 1 - guideAt(COHERENCE, t).level, 40);
+  assert.ok(score < 30, `opposite breathing scored ${score}`);
   m.reset();
   assert.equal(m.score, null);
+});
+
+test('SyncMeter: breathing at an unrelated pace scores well below following the guide', () => {
+  const { score } = runSync(unitBreath(17), 60);
+  assert.ok(score < 50, `unrelated breathing scored ${score}`);
 });

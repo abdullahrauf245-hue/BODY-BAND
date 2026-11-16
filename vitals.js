@@ -147,25 +147,35 @@
   /**
    * How closely the breath follows a guide, as 0..100.
    * It is the average gap between the two over roughly the last 8 seconds: no gap is 100,
-   * an average gap of half the scale or more is 0. Nothing is reported for the first
-   * WARMUP seconds, when there is too little to average.
+   * an average gap of half the scale or more is 0. A camera reading always arrives a little
+   * late, so the breath is compared with where the guide was at each of SyncMeter.DELAYS
+   * seconds ago and the best match counts: following the rhythm slightly behind is still
+   * in sync. Nothing is reported for the first WARMUP seconds.
    */
   class SyncMeter {
     constructor() { this.reset(); }
-    reset() { this.err = 0; this.age = 0; }
-    /** @returns {number|null} score, or null while warming up */
-    update(target, actual, dt) {
-      const gap = Math.abs(target - actual);
-      this.err = this.age === 0 ? gap : this.err + (gap - this.err) * (1 - Math.exp(-dt / 8));
+    reset() { this.errs = SyncMeter.DELAYS.map(() => 0); this.age = 0; }
+    /**
+     * @param {number[]} targets guide level now and at each earlier moment in SyncMeter.DELAYS
+     * @param {number} actual the breath, 0..1
+     * @returns {number|null} score, or null while warming up
+     */
+    update(targets, actual, dt) {
+      const k = 1 - Math.exp(-dt / 8);
+      for (let i = 0; i < this.errs.length; i++) {
+        const gap = Math.abs(targets[i] - actual);
+        this.errs[i] = this.age === 0 ? gap : this.errs[i] + (gap - this.errs[i]) * k;
+      }
       this.age += dt;
       return this.score;
     }
     get score() {
       if (this.age < SyncMeter.WARMUP) return null;
-      return Math.round(100 * Math.max(0, 1 - this.err / 0.5));
+      return Math.round(100 * Math.max(0, 1 - Math.min(...this.errs) / 0.5));
     }
   }
   SyncMeter.WARMUP = 4;
+  SyncMeter.DELAYS = [0, 0.5, 1, 1.5]; // seconds
 
   return { BreathScaler, PulseFilter, PhaseDetector, SyncMeter, guideAt };
 });
