@@ -124,12 +124,27 @@
     dlg.showModal();
     $('ccCancel').focus();
 
+    // Opens the camera the SDK will read. By default that is the browser's default camera; when
+    // the server was told to use a named one (PRESAGE_CAMERA_NAME, say a phone used as a webcam),
+    // this shows that one, so the check judges the camera that will really be measured.
+    async function openCamera() {
+      const base = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } };
+      const first = await navigator.mediaDevices.getUserMedia({ audio: false, video: base });
+      let want = '';
+      try { want = ((await (await fetch('/config')).json()).cameraName || '').trim().toLowerCase(); } catch (e) { /* no server config: use the default */ }
+      if (!want) return first;
+      const devices = await navigator.mediaDevices.enumerateDevices(); // labels are readable now that permission is granted
+      const hit = devices.find((d) => d.kind === 'videoinput' && d.label.toLowerCase().includes(want));
+      const track = first.getVideoTracks()[0];
+      if (hit && hit.deviceId === track.getSettings().deviceId) return first; // already the right one
+      first.getTracks().forEach((t) => t.stop());
+      if (!hit) throw Object.assign(new Error('wanted camera missing'), { name: 'WantedCameraMissing', want });
+      return navigator.mediaDevices.getUserMedia({ audio: false, video: { ...base, deviceId: { exact: hit.deviceId } } });
+    }
+
     (async () => {
       try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
-        });
+        const s = await openCamera();
         if (closed) { s.getTracks().forEach((t) => t.stop()); return; } // cancelled while asking
         stream = s;
         video.srcObject = s;
@@ -140,6 +155,11 @@
         say('MEASURING THE CAMERA…');
       } catch (e) {
         if (closed) return;
+        if (e && e.name === 'WantedCameraMissing') {
+          say(`THE CAMERA "${e.want.toUpperCase()}" IS NOT CONNECTED. THE SESSION WILL REFUSE TO START`, 'bad');
+          ready(false);
+          return;
+        }
         say(e && e.name === 'NotAllowedError'
           ? 'NO PREVIEW: CAMERA PERMISSION DENIED. YOU CAN STILL START.'
           : 'NO PREVIEW HERE. YOU CAN STILL START.');
