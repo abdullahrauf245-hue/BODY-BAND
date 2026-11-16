@@ -117,21 +117,19 @@
       super();
       this.label = 'SmartSpectra camera';
       this.pulse = 0; this.breathRate = 0; this.breath = 0;
-      this.target = 0; this.window = [];
+      this.target = 0;
+      this.scaler = new Vitals.BreathScaler();     // raw chest trace -> 0..1, outlier-proof
+      this.pulseFilter = new Vitals.PulseFilter(); // raw pulse rates -> a steady tempo
     }
     start() {
       const es = (this.es = new EventSource('/vitals'));
       es.addEventListener('vitals', (e) => {
         const d = JSON.parse(e.data);
-        if (d.pulse) this.pulse = d.pulse;
-        if (d.breathRate) this.breathRate = d.breathRate;
+        this.pulseFilter.accept(d.pulse);
+        if (d.breathRate >= 3 && d.breathRate <= 60) this.breathRate = d.breathRate; // breaths a minute a person can take
         if (d.trace && d.trace.length) {
-          // scale the raw chest trace to 0..1 using the last few breaths
-          // (keeps the newest 600 samples however many arrive at once; one pass for min/max)
-          this.window = this.window.concat(d.trace).slice(-600);
-          let min = Infinity, max = -Infinity;
-          for (const v of this.window) { if (v < min) min = v; if (v > max) max = v; }
-          if (max - min > 1e-6) this.target = (d.trace[d.trace.length - 1] - min) / (max - min);
+          const level = this.scaler.push(d.trace);
+          if (level !== null) this.target = level;
         }
       });
       es.addEventListener('status', (e) => this.emit({ type: 'status', text: JSON.parse(e.data).text }));
@@ -153,6 +151,7 @@
       super.stop();
     }
     update(dt) {
+      this.pulse = this.pulseFilter.step(dt);
       this.breath += (this.target - this.breath) * Math.min(1, dt * 6);
     }
   }
