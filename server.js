@@ -15,6 +15,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { toRgba } = require('./preview');
+const { pickCamera } = require('./camera-pick');
 
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_SECONDS = Number(process.env.PRESAGE_MAX_SECONDS) || 120;
@@ -23,6 +24,10 @@ const MAX_SECONDS = Number(process.env.PRESAGE_MAX_SECONDS) || 120;
 // webcams only reach that below 720p, so the default is 640x480 at 30.
 // Override in .env, for example: PRESAGE_CAMERA=1280x720@30
 const CAMERA_MODE = parseCameraMode(process.env.PRESAGE_CAMERA) || { width: 640, height: 480, fps: 30 };
+
+// Which webcam to read: part of its name (a phone used as a webcam, for example "iriun").
+// Empty means the default camera. Set PRESAGE_CAMERA_NAME in .env; see "npm run cameras".
+const CAMERA_NAME = (process.env.PRESAGE_CAMERA_NAME || '').trim();
 
 function parseCameraMode(text) {
   const m = /^(\d+)x(\d+)@(\d+)$/.exec((text || '').trim());
@@ -209,8 +214,17 @@ async function startSession(req, res) {
     if (session === s) endSession(FRIENDLY_ERRORS[code] || `SmartSpectra error ${code}: ${message}`);
   });
 
+  let selection = CameraSelection.default;
+  if (CAMERA_NAME) {
+    let found = [];
+    try { found = SmartSpectraSDK.availableCameras(); } catch (e) { /* reported as "no cameras were found" */ }
+    const pick = pickCamera(found, CAMERA_NAME);
+    if (pick.error) return endSession(pick.error);
+    selection = CameraSelection.byId(pick.camera.id);
+    console.log(`[vitals] using camera: ${pick.camera.name}`);
+  }
   try {
-    sdk.useCamera(CameraSelection.default, CAMERA_MODE);
+    sdk.useCamera(selection, CAMERA_MODE);
     sdk.start();
   } catch (e) {
     return endSession(FRIENDLY_ERRORS[e.code] || 'Could not start the camera: ' + e.message);
@@ -255,8 +269,12 @@ function fromThisPage(req) {
 
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
-  if (url === '/vitals' || url === '/preview') {
+  if (url === '/vitals' || url === '/preview' || url === '/config') {
     if (req.method !== 'GET' || !fromThisPage(req)) { res.writeHead(403); return res.end('Forbidden'); }
+    if (url === '/config') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify({ cameraName: CAMERA_NAME }));
+    }
     return url === '/vitals' ? void startSession(req, res) : sendPreview(res);
   }
   const entry = req.method === 'GET' && STATIC[url];

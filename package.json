@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "cameras": "node list-cameras.js",
     "test": "node --test"
   },
   "repository": {
