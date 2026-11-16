@@ -69,3 +69,8 @@ Testing/
 
 .env
 node_modules/
+# Third-party design skill installed for local use only
+.agents/
+.claude/
+skills-lock.json
+.taste-skill/
