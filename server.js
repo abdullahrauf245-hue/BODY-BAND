@@ -37,6 +37,7 @@ const STATIC = {
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/audio.js': ['audio.js', 'text/javascript; charset=utf-8'],
   '/signals.js': ['signals.js', 'text/javascript; charset=utf-8'],
+  '/vitals.js': ['vitals.js', 'text/javascript; charset=utf-8'],
   '/camview.js': ['camview.js', 'text/javascript; charset=utf-8'],
   '/camcheck.js': ['camcheck.js', 'text/javascript; charset=utf-8'],
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
@@ -50,6 +51,49 @@ const FRIENDLY_HINTS = {
   // A webcam in dim light lengthens its exposure and drops to about 15 frames a second.
   11: 'Camera too slow (under 25 frames a second). Light facing you usually fixes it.',
 };
+
+// SDK errors in plain words (by SmartSpectraErrorCode). Anything else shows the SDK's own text.
+const FRIENDLY_ERRORS = {
+  2: 'Presage did not accept the API key. Check PRESAGE_API_KEY in the .env file.',
+  4: 'The Presage minutes on this API key are used up.',
+  5: 'Could not reach Presage. Check the internet connection and try again.',
+  6: 'Presage had a problem on its side. Try again in a minute.',
+  7: 'The webcam could not be opened. Close other apps that use the camera (Teams, Zoom, the Camera app) and try again.',
+  13: 'This API key is not allowed to use one of the readings Body Band asks for.',
+  14: 'The camera stayed under 25 frames a second, so measuring stopped. Add light facing you and try again.',
+};
+
+// BODYBAND_DEBUG=1 prints a summary of the raw readings in this window every 10 seconds,
+// for tuning. Nothing is written to disk.
+const DEBUG = process.env.BODYBAND_DEBUG === '1';
+
+function newStats() {
+  return { packets: 0, samples: 0, stable: 0, min: Infinity, max: -Infinity, smooth: null, rising: 0, falling: 0, pulse: null, rate: null };
+}
+
+function noteStats(st, points, pulse, rate) {
+  st.packets++;
+  for (const p of points) {
+    st.samples++;
+    if (p.stable) st.stable++;
+    if (p.value < st.min) st.min = p.value;
+    if (p.value > st.max) st.max = p.value;
+    const before = st.smooth; // lightly smoothed, so noise does not decide "rising" or "falling"
+    st.smooth = before === null ? p.value : before + (p.value - before) * 0.1;
+    if (before !== null) { if (st.smooth > before) st.rising++; else if (st.smooth < before) st.falling++; }
+  }
+  if (pulse) st.pulse = pulse;
+  if (rate) st.rate = rate;
+}
+
+function printStats(st, seconds) {
+  const reading = (r) => (r ? `${r.value.toFixed(1)} (confidence ${Number(r.confidence).toFixed(2)}, stable ${r.stable})` : 'none yet');
+  const moving = st.rising + st.falling;
+  console.log(`[debug] last ${seconds}s: ${(st.packets / seconds).toFixed(1)} packets/s, ` +
+    `${(st.samples / seconds).toFixed(1)} chest samples/s (${st.samples ? Math.round(100 * st.stable / st.samples) : 0}% marked stable), ` +
+    `raw range ${st.min.toFixed(3)}..${st.max.toFixed(3)}, rising ${moving ? Math.round(100 * st.rising / moving) : 0}% of the time ` +
+    `| pulse ${reading(st.pulse)} | breathing ${reading(st.rate)}`);
+}
 
 let session = null;            // the one active camera session, if any
 let teardown = Promise.resolve();
@@ -119,7 +163,7 @@ async function startSession(req, res) {
 
   const s = (session = {
     sdk, res, startedAt: Date.now(), packets: 0, lastCode: -1,
-    frame: null, frames: 0, framesAtLastTick: 0, ticks: 0,
+    frame: null, frames: 0, framesAtLastTick: 0, ticks: 0, stats: newStats(),
   });
 
   sdk.on('validationStatus', (code, ts, hint) => {
@@ -144,7 +188,9 @@ async function startSession(req, res) {
     try { m = decodeMetrics(buf); } catch (e) { return; }
     const pulse = last(m.cardio && m.cardio.pulseRate);
     const rate = last(m.breathing && m.breathing.rate);
-    const trace = ((m.breathing && m.breathing.upperTrace) || []).map((p) => p.value);
+    const points = (m.breathing && m.breathing.upperTrace) || [];
+    const trace = points.map((p) => p.value);
+    if (DEBUG) noteStats(s.stats, points, pulse, rate);
     if (s.packets < 5) {
       console.log(`[vitals] packet ${s.packets + 1}: pulse=${pulse ? pulse.value.toFixed(1) : '-'} ` +
         `breathRate=${rate ? rate.value.toFixed(1) : '-'} traceSamples=${trace.length}`);
@@ -160,14 +206,14 @@ async function startSession(req, res) {
 
   sdk.on('error', (code, message, retryable) => {
     console.error(`[vitals] SmartSpectra error ${code}: ${message}`);
-    if (session === s) endSession(`SmartSpectra error ${code}: ${message}`);
+    if (session === s) endSession(FRIENDLY_ERRORS[code] || `SmartSpectra error ${code}: ${message}`);
   });
 
   try {
     sdk.useCamera(CameraSelection.default, CAMERA_MODE);
     sdk.start();
   } catch (e) {
-    return endSession('Could not start the camera: ' + e.message);
+    return endSession(FRIENDLY_ERRORS[e.code] || 'Could not start the camera: ' + e.message);
   }
   console.log(`[vitals] session started (camera ${CAMERA_MODE.width}x${CAMERA_MODE.height}@${CAMERA_MODE.fps}, auto-stops after ${MAX_SECONDS}s)`);
 
@@ -177,6 +223,10 @@ async function startSession(req, res) {
     const fps = s.frames - s.framesAtLastTick; // camera frames in the last second
     s.framesAtLastTick = s.frames;
     if (++s.ticks % 10 === 3) console.log(`[vitals] camera rate: ${fps} frames a second`);
+    if (DEBUG && s.ticks % 10 === 0) {
+      printStats(s.stats, 10);
+      s.stats = Object.assign(newStats(), { smooth: s.stats.smooth, pulse: s.stats.pulse, rate: s.stats.rate });
+    }
     send(res, 'tick', { left, fps, width: s.frame ? s.frame.width : 0, height: s.frame ? s.frame.height : 0 });
   }, 1000);
   send(res, 'tick', { left: MAX_SECONDS, fps: 0, width: 0, height: 0 });
