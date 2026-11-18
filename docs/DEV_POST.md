@@ -72,7 +72,12 @@ SmartSpectra SDK (`MetricType.PULSE_RATE`, `BREATHING_RATE`, `CHEST_BREATHING`).
   one-button manual mode emit the same events, which is how the hosted demo works without a
   camera.
 
-<!-- TODO after the first real session: say what the readings looked like and anything tuned. -->
+**What the real readings looked like.** In the first live camera session the SDK delivered one
+to two chest-trace samples per packet while the camera held 29 to 30 frames a second. Raw
+readings are not perfectly clean, so I tuned for that: pulse readings outside 35 to 200 are
+ignored, each pulse shown is the median of the last five, the breath scale ignores outliers,
+and the SYNC score allows about a second of sensor delay when comparing your breath with the
+guide. These parts have unit tests (`npm test`, 27 passing).
 
 ## Prize Categories
 
