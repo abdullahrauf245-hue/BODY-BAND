@@ -377,3 +377,25 @@ button.key:hover:not(:disabled) { background: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Dark theme: easy on the eyes, less glare on the face while the camera reads it */
+:root {
+  --base: #0F1115;
+  --muted: #181B21;
+  --card: #14171C;
+  --hairline: #2A2E36;
+  --border: #22262D;
+  --ink: #E6E7EA;
+  --charcoal: #C9CBD1;
+  --dim: #9BA0AA;
+  --subtle: #8A8F99;
+  --cyan-text: #4DB8FF;
+  color-scheme: dark;
+}
+.seg button[aria-pressed="true"],
+.key.dark,
+.key.state.live,
+.cta { color: #0F1115; }
+.ladder i { background: #2A2E36; }
+.ladder i.on { background: var(--ink); }
+.cc::backdrop { background: rgba(0, 0, 0, 0.6); }
