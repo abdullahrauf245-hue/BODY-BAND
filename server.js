@@ -55,6 +55,9 @@ const PREVIEW_WIDTH = 320; // pixels; plenty for the small camera panel
 const FRIENDLY_HINTS = {
   // A webcam in dim light lengthens its exposure and drops to about 15 frames a second.
   11: 'Camera too slow (under 25 frames a second). Light facing you usually fixes it.',
+  // The SDK needs head, shoulders and chest, and says so tersely.
+  7: 'Sit back so your head, shoulders and chest are all in the frame.',
+  16: 'Tilt the camera down, or sit up, so you are in the middle of the frame.',
 };
 
 // SDK errors in plain words (by SmartSpectraErrorCode). Anything else shows the SDK's own text.
