@@ -230,7 +230,7 @@ button.key:hover:not(:disabled) { background: var(--muted); }
   font-size: 8px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--cyan); border: 1px dashed var(--cyan); background: rgba(0, 163, 255, 0.1);
 }
-.vf-tag { position: absolute; left: 6px; bottom: 4px; font-size: 7px; color: rgba(255, 255, 255, 0.5); }
+.vf-tag { position: absolute; left: 18px; bottom: 4px; font-size: 7px; color: rgba(255, 255, 255, 0.5); }
 .rows { display: grid; gap: 3px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 8px; }
 .rows div { display: flex; justify-content: space-between; }
 .rows span { color: var(--subtle); }
