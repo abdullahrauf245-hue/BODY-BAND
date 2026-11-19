@@ -13,6 +13,7 @@
   const WAVE_POINTS = 120;           // samples in the breath trace on the plate
   const WAVE_PERIOD = 1 / 30;        // seconds between trace samples
   const TEXT_PERIOD = 0.095;         // seconds between text refreshes (about 10 a second)
+  const HINT_HOLD = 4;               // seconds a camera complaint stays up after the SDK says "ok" again
   const WAVE_X = Array.from({ length: WAVE_POINTS }, (_, i) => (i * 160 / (WAVE_POINTS - 1)).toFixed(1));
 
   const SOURCES = {
@@ -39,7 +40,7 @@
       phase: 'HOLD', phaseStart: 0, cycles: 0,
       detector: new Vitals.PhaseDetector(), // which way the breath is going, and the breath count
       sync: new Vitals.SyncMeter(), syncScore: null, // how closely the breath follows a guide
-      hint: '',                             // the camera's latest complaint, '' when it is happy
+      hint: '', hintAt: 0,                  // the camera's latest complaint, and when it was last heard
       beatGlow: 0, lastBeat: 0, intervals: [], hist: [], histDirty: false, waveAcc: 0,
       startT: 0, lastDraw: 0, nextText: 0, left: null,
     });
@@ -220,8 +221,12 @@
   /** What the camera panel and the status line say during a camera session. */
   function showCameraMessage() {
     // The SDK's own hint wins; otherwise say whether its first pulse reading has arrived yet.
-    setText('camHint', st.hint || (st.pulse ? 'READING VITALS' : 'FINDING YOUR PULSE. KEEP STILL'));
-    setText('subNotice', st.hint || (st.pulse ? 'RUNNING' : 'FINDING YOUR PULSE. KEEP STILL'));
+    // The SDK flips between "ok" and a complaint every second or two while it cannot see the
+    // chest, so a complaint stays up for HINT_HOLD seconds instead of blinking away.
+    const held = performance.now() / 1000 - st.hintAt < HINT_HOLD ? st.hint : '';
+    const text = held || (st.pulse ? '' : 'FINDING YOUR PULSE. KEEP STILL');
+    setText('camHint', text || 'READING VITALS');
+    setText('subNotice', text || 'RUNNING');
   }
 
   function render() {
@@ -284,7 +289,7 @@
         if (e.type === 'frame') onSignal(e);
         else if (e.type === 'beat') onBeat();
         else if (e.type === 'status') {
-          st.hint = e.text || '';
+          if (e.text) { st.hint = e.text; st.hintAt = performance.now() / 1000; }
           showCameraMessage();
         } else if (e.type === 'time') {
           st.left = e.left;
