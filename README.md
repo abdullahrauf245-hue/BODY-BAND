@@ -13,6 +13,9 @@ hosted page; see [Run it](#run-it) below.
 
 ![Body Band console during a session](docs/screenshot.jpg)
 
+**Demo video (20 s, with sound):** [watch a live camera session](docs/demo.mp4) — pulse and
+breathing read from a webcam by the SmartSpectra SDK, driving the pad and the heartbeat notes.
+
 ## How it works
 
 | Your body | The music | On screen |
