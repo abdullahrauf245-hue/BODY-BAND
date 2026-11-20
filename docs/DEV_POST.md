@@ -6,8 +6,6 @@ tags: devchallenge, presagechallenge, webdev, javascript
 
 *This is a submission for the [Presage SmartSpectra SDK Challenge](https://dev.to/challenges/presage-2026-11-04).*
 
-<!-- DRAFT. Before publishing: fill every TODO, check the claims against the final build, set published: true. -->
-
 ## What I Built
 
 **Body Band** turns your body into a musical instrument. A webcam reads your pulse and
@@ -27,9 +25,10 @@ your body does.
 
 ## Demo
 
-<!-- TODO: embed the demo video once a real camera session has been recorded. It must show
-     live Presage readings (pulse number, breathing arc) driving the sound. -->
-TODO: demo video
+A 20-second live camera session, with sound: the SDK reads my pulse and breathing from the
+webcam, and the breathing arc and the music follow them.
+
+{% embed https://youtu.be/9h75S_-VV5w %}
 
 Try the interface without a camera: https://bodyband.vercel.app (Simulated and Manual modes).
 Camera mode runs on your own computer, because the SDK reads the webcam there.
@@ -105,10 +104,3 @@ the arc on the needle.
 - **AI services.** None.
 - **Not medical.** Body Band is an art and wellbeing project. It makes no diagnosis, gives no
   health advice, and its readings should not be used for any health decision.
-
-## Agent Session
-
-<!-- Optional. To include it: upload the transcript at https://dev.to/agent_sessions/new,
-     press Make Public, and embed it here. Read it first: it contains your own messages and
-     project details. Otherwise delete this section. -->
-Built with Claude Code. TODO: embed the session or remove this section.
