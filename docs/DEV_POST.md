@@ -1,6 +1,6 @@
 ---
 title: Body Band: your heartbeat sets the rhythm, your breath shapes the sound
-published: false
+published: true
 tags: devchallenge, presagechallenge, webdev, javascript
 ---
 
@@ -81,7 +81,7 @@ passing).
 
 ## Prize Categories
 
-Most Creative or Delightful Use. You hear your heartbeat and breathing as music, and you
+**Most Creative or Delightful Use.** You hear your heartbeat and breathing as music, and you
 change the music by changing how you breathe. Slow, deep breaths make long, open swells, and
 a faster heart makes the melody climb. With a guide on, breathing becomes a small game of
 keeping the arc on the needle.
