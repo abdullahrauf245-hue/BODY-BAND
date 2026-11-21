@@ -81,10 +81,26 @@ passing).
 
 ## Prize Categories
 
+I'm entering both **Most Creative or Delightful Use** and **Best Thoughtful Real-World Use**.
+
 **Most Creative or Delightful Use.** You hear your heartbeat and breathing as music, and you
 change the music by changing how you breathe. Slow, deep breaths make long, open swells, and
 a faster heart makes the melody climb. With a guide on, breathing becomes a small game of
 keeping the arc on the needle.
+
+Several entries this month turn pulse into music, so here is what Body Band does differently.
+The pulse is not only a tempo setting: every beat at your measured pulse plays its own kick
+and its own note, so the melody is your heart rate, one note per beat. The breath sound
+follows the SDK's chest-breathing trace, not the breathing rate, so the pad opens while you
+are still breathing in and closes as you breathe out. And the breathing guides give you
+something to practise: the needle shows where your breath should be, and the SYNC score says
+how closely you followed it.
+
+**Best Thoughtful Real-World Use.** Breathing patterns like 4-7-8 and box breathing are easy
+to read about and hard to keep to, because nothing tells you when you drift off the count.
+Body Band gives you a two-minute session at your desk with only a webcam, and the SYNC score
+compares your measured chest movement with the guide, so you can see whether you actually
+followed it. It stores no video and no readings, so it can run on a work or shared computer.
 
 ## Consent and Data Handling
 
